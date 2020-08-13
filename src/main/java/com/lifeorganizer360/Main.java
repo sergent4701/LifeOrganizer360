@@ -22,6 +22,7 @@ import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.stage.Stage;
 import javafx.scene.Node;
+import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextArea;
@@ -30,7 +31,6 @@ import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.BorderPane;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.layout.Background;
@@ -40,17 +40,14 @@ import javafx.scene.layout.Pane;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.Cursor;
 import javafx.scene.input.MouseEvent;
-import javafx.scene.effect.DropShadow;
-import javafx.scene.shape.Circle;
-import javafx.geometry.Pos;
 import javafx.scene.layout.Region;
 
 @SuppressWarnings("restriction")
 public class Main extends Application {
 
 	private static final Pane workspace = new Pane();
-	private static final Stage addStage = new Stage();
 	private static Stage primaryStage = null;
+	private static VBox mainContainer = new VBox();
 
 	private static ArrayList<TaskBase> entities;
 	private static boolean dependencyInit = false;
@@ -70,7 +67,6 @@ public class Main extends Application {
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public void start(final Stage p) {
 		primaryStage = p;
-		VBox mainContainer = new VBox();
 
 		final HBox toolBar = new HBox(5);
 		VBox logoandgreeting = new VBox(5);
@@ -82,75 +78,6 @@ public class Main extends Application {
 		greeting.setFont(new Font(18));
 
 		Button addBtn = new Button("+");
-
-		addBtn.setOnAction(new EventHandler() {
-			public void handle(Event event) {
-				VBox addForm = new VBox(10);
-
-				final ComboBox<String> dropdown = new ComboBox<String>();
-				dropdown.setPromptText("Select Type");
-				dropdown.getItems().add("Goal");
-				dropdown.getItems().add("Task");
-
-				Label titleL = new Label("Title:");
-				final TextField titleF = new TextField();
-				VBox titleV = new VBox(3);
-				titleV.getChildren().add(titleL);
-				titleV.getChildren().add(titleF);
-				titleF.setMaxWidth(580);
-
-				Label descL = new Label("Description:");
-				final TextArea descF = new TextArea();
-				VBox descV = new VBox(3);
-				descV.getChildren().add(descL);
-				descV.getChildren().add(descF);
-				descF.setMaxWidth(580);
-
-				Button submitBtn = new Button("Submit");
-
-				addForm.getChildren().add(dropdown);
-				addForm.getChildren().add(titleV);
-				addForm.getChildren().add(descV);
-				addForm.getChildren().add(submitBtn);
-
-				Scene scene = new Scene(addForm, 600, 300);
-
-				addStage.setTitle("Add Goal/Task");
-				addStage.setScene(scene);
-				addStage.setResizable(false);
-				addStage.show();
-
-				submitBtn.setOnAction(new EventHandler() {
-					public void handle(Event event) {
-						addStage.close();
-
-						workspace.setCursor(Cursor.CROSSHAIR);
-
-						final EventHandler filter = new EventHandler<MouseEvent>() {
-							public void handle(MouseEvent e) {
-								workspace.setCursor(Cursor.DEFAULT);
-								TaskBase x = null;
-								switch (dropdown.getValue()) {
-								case "Goal":
-									x = new Goal(titleF.getText(), descF.getText(), e.getX(), e.getY());
-									break;
-								case "Task":
-									x = new Task(titleF.getText(), descF.getText(), e.getX(), e.getY());
-									break;
-								}
-								addAndShow(x);
-								session.save(x);
-								workspace.removeEventFilter(MouseEvent.MOUSE_CLICKED, this);
-
-							}
-
-						};
-
-						workspace.addEventFilter(MouseEvent.MOUSE_CLICKED, filter);
-					}
-				});
-			}
-		});
 
 		workspace.setMinWidth(startingWindowWidth);
 		workspace.setMinHeight(startingWindowHeight - toolBarHeight);
@@ -169,7 +96,7 @@ public class Main extends Application {
 		toolBar.setBackground(toolBarBackground);
 
 		for (TaskBase e : entities) {
-			workspace.getChildren().add(e.generatePane());
+			workspace.getChildren().add(e.getPane());
 		}
 		for (TaskBase e : entities) {
 			for (TaskBase d : e.getDependencies()) {
@@ -202,6 +129,12 @@ public class Main extends Application {
 
 		Scene scene = new Scene(mainContainer, startingWindowWidth, startingWindowHeight);
 
+		addBtn.setOnAction(new EventHandler() {
+			public void handle(Event event) {
+				scene.setRoot(generateTaskForm());
+			}
+		});
+
 		scene.widthProperty().addListener(new ChangeListener() {
 			public void changed(ObservableValue observable, Object oldValue, Object newValue) {
 				workspace.setMinWidth((Double) newValue);
@@ -227,7 +160,6 @@ public class Main extends Application {
 			public void handle(Event event) {
 				nativeDriver.close();
 				ogmDriver.close();
-				addStage.close();
 			}
 		});
 	}
@@ -273,11 +205,6 @@ public class Main extends Application {
 		entities = new ArrayList<TaskBase>(session.loadAll(TaskBase.class, -1));
 	}
 
-	private void addAndShow(TaskBase x) {
-		entities.add(x);
-		workspace.getChildren().add(x.generatePane());
-	}
-
 	public static void setDependencyInit(boolean b) {
 		dependencyInit = b;
 	}
@@ -302,6 +229,132 @@ public class Main extends Application {
 
 	public static TaskBase getDependencyParent() {
 		return dependencyParent;
+	}
+
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public static Parent generateTaskForm(final TaskBase t) {
+		final String[] old = new String[1];
+		old[0] = null;
+		VBox taskForm = new VBox(10);
+
+		Button backBtn = new Button("<--");
+
+		final ComboBox<String> dropdown = new ComboBox<String>();
+		dropdown.setPromptText("Select Type");
+		dropdown.getItems().add("Goal");
+		dropdown.getItems().add("Task");
+
+		Label titleL = new Label("Title:");
+		final TextField titleF = new TextField();
+		VBox titleV = new VBox(3);
+		titleV.getChildren().add(titleL);
+		titleV.getChildren().add(titleF);
+		titleF.setMaxWidth(580);
+
+		Label descL = new Label("Description:");
+		final TextArea descF = new TextArea();
+		VBox descV = new VBox(3);
+		descV.getChildren().add(descL);
+		descV.getChildren().add(descF);
+		descF.setMaxWidth(580);
+
+		Button submitBtn = new Button("Submit");
+
+		taskForm.getChildren().add(backBtn);
+		taskForm.getChildren().add(dropdown);
+		taskForm.getChildren().add(titleV);
+		taskForm.getChildren().add(descV);
+		taskForm.getChildren().add(submitBtn);
+
+		if (t != null) {
+			titleF.setText(t.getTitle());
+			descF.setText(t.getDescription());
+			if (t instanceof Goal) {
+				old[0] = "Goal";
+			} else if (t instanceof Task) {
+				old[0] = "Task";
+			}
+			dropdown.setValue(old[0]);
+			Button delBtn = new Button("Delete");
+			delBtn.setOnAction(new EventHandler() {
+				public void handle(Event event) {
+					primaryStage.getScene().setRoot(mainContainer);
+					workspace.getChildren().remove(t.getPane());
+					session.delete(session.load(TaskBase.class, t.getId()));
+					entities.remove(t);
+				}
+			});
+			taskForm.getChildren().add(delBtn);
+
+		}
+		backBtn.setOnAction(new EventHandler() {
+			public void handle(Event event) {
+				primaryStage.getScene().setRoot(mainContainer);
+			}
+		});
+
+		submitBtn.setOnAction(new EventHandler() {
+			public void handle(Event event) {
+				primaryStage.getScene().setRoot(mainContainer);
+
+				if (t == null) {
+					workspace.setCursor(Cursor.CROSSHAIR);
+
+					final EventHandler filter = new EventHandler<MouseEvent>() {
+						public void handle(MouseEvent e) {
+							workspace.setCursor(Cursor.DEFAULT);
+							TaskBase x = t;
+							switch (dropdown.getValue()) {
+							case "Goal":
+								x = new Goal(titleF.getText(), descF.getText(), e.getX(), e.getY());
+								break;
+							case "Task":
+								x = new Task(titleF.getText(), descF.getText(), e.getX(), e.getY());
+								break;
+							}
+							entities.add(x);
+							workspace.getChildren().add(x.getPane());
+							session.save(x);
+							workspace.removeEventFilter(MouseEvent.MOUSE_CLICKED, this);
+
+						}
+
+					};
+
+					workspace.addEventFilter(MouseEvent.MOUSE_CLICKED, filter);
+				} else if (!old[0].equals(dropdown.getValue())) {
+					TaskBase x = null;
+					switch (dropdown.getValue()) {
+					case "Goal":
+						x = new Goal(titleF.getText(), descF.getText(), t.getX(), t.getY());
+						break;
+					case "Task":
+						x = new Task(titleF.getText(), descF.getText(), t.getX(), t.getY());
+						break;
+					}
+					entities.add(x);
+					workspace.getChildren().add(x.getPane());
+					session.save(x);
+					workspace.getChildren().remove(t.getPane());
+					session.delete(session.load(TaskBase.class, t.getId()));
+					entities.remove(t);
+				} else {
+					t.setTitle(titleF.getText());
+					t.setDescription(descF.getText());
+					session.save(t);
+				}
+
+			}
+		});
+		return taskForm;
+	}
+
+	public static Parent generateTaskForm() {
+		return generateTaskForm(null);
+	}
+
+	public static Stage getPrimaryStage() {
+		return primaryStage;
 	}
 
 }
