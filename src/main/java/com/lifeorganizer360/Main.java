@@ -19,8 +19,10 @@ import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.event.Event;
 import javafx.event.EventHandler;
+import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
 import javafx.stage.Stage;
+import tornadofx.control.DateTimePicker;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -41,19 +43,21 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.Cursor;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Region;
+import javafx.scene.shape.Line;
 
 @SuppressWarnings("restriction")
 public class Main extends Application {
 
 	private static final Pane workspace = new Pane();
 	private static Stage primaryStage = null;
+	private static VBox workspaceContainer = new VBox();
 	private static VBox mainContainer = new VBox();
 
 	private static ArrayList<TaskBase> entities;
 	private static boolean dependencyInit = false;
 	private static TaskBase dependencyParent = null;
 
-	private double toolBarHeight = 80;
+	private static double toolBarHeight = 80;
 	private double startingWindowWidth = 1000;
 	private double startingWindowHeight = 688;
 	private double minimumWindowWidth = 450;
@@ -66,6 +70,9 @@ public class Main extends Application {
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public void start(final Stage p) {
+		Button startBtn = new Button("Start");
+		mainContainer.getChildren().add(startBtn);
+
 		primaryStage = p;
 
 		final HBox toolBar = new HBox(5);
@@ -95,23 +102,6 @@ public class Main extends Application {
 		Background toolBarBackground = new Background(toolBarBackgroundFill);
 		toolBar.setBackground(toolBarBackground);
 
-		for (TaskBase e : entities) {
-			workspace.getChildren().add(e.getPane());
-		}
-		for (TaskBase e : entities) {
-			for (TaskBase d : e.getDependencies()) {
-				Arrow dependency = new Arrow(e.getX() + 75, e.getY() + 93, d.getX() + 73, d.getY() + 8);
-				dependency.setStrokeWidth(3);
-				dependency.setStroke(Color.BLACK);
-				workspace.getChildren().add(dependency.getLines()[0]);
-				workspace.getChildren().add(dependency.getLines()[1]);
-				workspace.getChildren().add(dependency.getLines()[2]);
-				e.getStartArrows().add(dependency);
-				d.getEndArrows().add(dependency);
-
-			}
-		}
-
 		logoandgreeting.getChildren().add(logo);
 		logoandgreeting.getChildren().add(greeting);
 
@@ -124,8 +114,8 @@ public class Main extends Application {
 		scroll.setPrefWidth(startingWindowWidth);
 		scroll.setPrefHeight(startingWindowHeight - toolBarHeight);
 
-		mainContainer.getChildren().add(toolBar);
-		mainContainer.getChildren().add(scroll);
+		workspaceContainer.getChildren().add(toolBar);
+		workspaceContainer.getChildren().add(scroll);
 
 		Scene scene = new Scene(mainContainer, startingWindowWidth, startingWindowHeight);
 
@@ -150,6 +140,26 @@ public class Main extends Application {
 			}
 
 		});
+		startBtn.setOnAction(new EventHandler() {
+			public void handle(Event event) {
+				scene.setRoot(workspaceContainer);
+				for (TaskBase e : entities) {
+					workspace.getChildren().add(e.getPane());
+				}
+				for (TaskBase e : entities) {
+					for (TaskBase d : e.getDependencies()) {
+
+						Line dependency = new Line();
+						dependency.setStrokeWidth(3);
+						dependency.setStroke(Color.BLACK);
+						workspace.getChildren().add(dependency);
+						e.addStartLine(dependency);
+						d.addEndLine(dependency);
+
+					}
+				}
+			}
+		});
 
 		primaryStage.setMinWidth(minimumWindowWidth);
 		primaryStage.setMinHeight(minimumWindowHeight);
@@ -162,6 +172,7 @@ public class Main extends Application {
 				ogmDriver.close();
 			}
 		});
+
 	}
 
 	public static org.neo4j.driver.Driver connect(String uri, String user, String password) {
@@ -233,8 +244,6 @@ public class Main extends Application {
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public static Parent generateTaskForm(final TaskBase t) {
-		final String[] old = new String[1];
-		old[0] = null;
 		VBox taskForm = new VBox(10);
 
 		Button backBtn = new Button("<--");
@@ -244,41 +253,71 @@ public class Main extends Application {
 		dropdown.getItems().add("Goal");
 		dropdown.getItems().add("Task");
 
+		dropdown.setValue("Task");
+
 		Label titleL = new Label("Title:");
 		final TextField titleF = new TextField();
-		VBox titleV = new VBox(3);
-		titleV.getChildren().add(titleL);
-		titleV.getChildren().add(titleF);
+		VBox titleV = new VBox(3, titleL, titleF);
 		titleF.setMaxWidth(580);
 
 		Label descL = new Label("Description:");
 		final TextArea descF = new TextArea();
-		VBox descV = new VBox(3);
-		descV.getChildren().add(descL);
-		descV.getChildren().add(descF);
+		VBox descV = new VBox(3, descL, descF);
 		descF.setMaxWidth(580);
+
+		Label awardL = new Label("Award:");
+		final TextField awardF = new TextField();
+		VBox awardV = new VBox(3, awardL, awardF);
+		awardF.setMinWidth(188);
+
+		Label penaltyL = new Label("Penalty:");
+		final TextField penaltyF = new TextField();
+		VBox penaltyV = new VBox(3, penaltyL, penaltyF);
+		penaltyF.setMinWidth(188);
+
+		HBox apContainer = new HBox(10, awardV, penaltyV);
+
+		Label startL = new Label("Start:");
+		final DateTimePicker startF = new DateTimePicker();
+		startF.setFormat("MMM dd, yyyy hh:mm a");
+		VBox startV = new VBox(3, startL, startF);
+
+		Label endL = new Label("End:");
+		final DateTimePicker endF = new DateTimePicker();
+		endF.setFormat("MMM dd, yyyy hh:mm a");
+		VBox endV = new VBox(3, endL, endF);
+
+		HBox seContainer = new HBox(10, startV, endV);
 
 		Button submitBtn = new Button("Submit");
 
 		taskForm.getChildren().add(backBtn);
-		taskForm.getChildren().add(dropdown);
-		taskForm.getChildren().add(titleV);
-		taskForm.getChildren().add(descV);
-		taskForm.getChildren().add(submitBtn);
+		if (t == null)
+			taskForm.getChildren().add(dropdown);
+		taskForm.getChildren().addAll(titleV, descV, apContainer, seContainer, submitBtn);
+
+		dropdown.getSelectionModel().selectedItemProperty().addListener((options, oldValue, newValue) -> {
+			switch (newValue) {
+			case "Goal":
+				
+				break;
+			case "Task":
+				break;
+			}
+		});
 
 		if (t != null) {
 			titleF.setText(t.getTitle());
 			descF.setText(t.getDescription());
-			if (t instanceof Goal) {
-				old[0] = "Goal";
-			} else if (t instanceof Task) {
-				old[0] = "Task";
-			}
-			dropdown.setValue(old[0]);
+			awardF.setText(t.getAward() + "");
+			penaltyF.setText(t.getPenalty() + "");
+			startF.setDateTimeValue(t.getStart());
+			endF.setDateTimeValue(t.getEnd());
+
 			Button delBtn = new Button("Delete");
 			delBtn.setOnAction(new EventHandler() {
 				public void handle(Event event) {
-					primaryStage.getScene().setRoot(mainContainer);
+					primaryStage.getScene().setRoot(workspaceContainer);
 					workspace.getChildren().remove(t.getPane());
 					session.delete(session.load(TaskBase.class, t.getId()));
 					entities.remove(t);
@@ -289,13 +328,13 @@ public class Main extends Application {
 		}
 		backBtn.setOnAction(new EventHandler() {
 			public void handle(Event event) {
-				primaryStage.getScene().setRoot(mainContainer);
+				primaryStage.getScene().setRoot(workspaceContainer);
 			}
 		});
 
 		submitBtn.setOnAction(new EventHandler() {
 			public void handle(Event event) {
-				primaryStage.getScene().setRoot(mainContainer);
+				primaryStage.getScene().setRoot(workspaceContainer);
 
 				if (t == null) {
 					workspace.setCursor(Cursor.CROSSHAIR);
@@ -306,10 +345,14 @@ public class Main extends Application {
 							TaskBase x = t;
 							switch (dropdown.getValue()) {
 							case "Goal":
-								x = new Goal(titleF.getText(), descF.getText(), e.getX(), e.getY());
+								x = new Goal(titleF.getText(), descF.getText(), Double.parseDouble(awardF.getText()),
+										Double.parseDouble(penaltyF.getText()), startF.getDateTimeValue(),
+										endF.getDateTimeValue(), e.getX(), e.getY());
 								break;
 							case "Task":
-								x = new Task(titleF.getText(), descF.getText(), e.getX(), e.getY());
+								x = new Task(titleF.getText(), descF.getText(), Double.parseDouble(awardF.getText()),
+										Double.parseDouble(penaltyF.getText()), startF.getDateTimeValue(),
+										endF.getDateTimeValue(), e.getX(), e.getY());
 								break;
 							}
 							entities.add(x);
@@ -322,31 +365,19 @@ public class Main extends Application {
 					};
 
 					workspace.addEventFilter(MouseEvent.MOUSE_CLICKED, filter);
-				} else if (!old[0].equals(dropdown.getValue())) {
-					TaskBase x = null;
-					switch (dropdown.getValue()) {
-					case "Goal":
-						x = new Goal(titleF.getText(), descF.getText(), t.getX(), t.getY());
-						break;
-					case "Task":
-						x = new Task(titleF.getText(), descF.getText(), t.getX(), t.getY());
-						break;
-					}
-					entities.add(x);
-					workspace.getChildren().add(x.getPane());
-					session.save(x);
-					workspace.getChildren().remove(t.getPane());
-					session.delete(session.load(TaskBase.class, t.getId()));
-					entities.remove(t);
 				} else {
-					t.setTitle(titleF.getText());
-					t.setDescription(descF.getText());
+					t.save(titleF.getText(), descF.getText(), Double.parseDouble(awardF.getText()),
+							Double.parseDouble(penaltyF.getText()), startF.getDateTimeValue(), endF.getDateTimeValue());
 					session.save(t);
 				}
 
 			}
 		});
 		return taskForm;
+	}
+
+	public static double getToolBarHeight() {
+		return toolBarHeight;
 	}
 
 	public static Parent generateTaskForm() {

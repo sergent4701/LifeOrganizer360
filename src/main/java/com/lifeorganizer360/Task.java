@@ -1,9 +1,12 @@
 package com.lifeorganizer360;
 
+import java.time.LocalDateTime;
+
 import org.neo4j.ogm.annotation.*;
 
 import javafx.event.Event;
 import javafx.event.EventHandler;
+import javafx.geometry.Bounds;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
@@ -14,9 +17,12 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.text.Font;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.shape.Line;
 
 @SuppressWarnings("restriction")
 @NodeEntity
@@ -26,12 +32,13 @@ public class Task extends TaskBase {
 		super();
 	}
 
-	protected Task(String title, String description, double xPos, double yPos) {
-		super(title, description, xPos, yPos);
+	protected Task(String title, String description, double award, double penalty, LocalDateTime start,
+			LocalDateTime end, double xPos, double yPos) {
+		super(title, description, award, penalty, start, end, xPos, yPos);
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public Node getPane() {
+	public Pane getPane() {
 
 		if (super.getPane() == null) {
 			TaskBase e = this;
@@ -46,6 +53,8 @@ public class Task extends TaskBase {
 
 			Circle topCircle = new Circle(4);
 			Circle bottomCircle = new Circle(4);
+			setTop(topCircle);
+			setBottom(bottomCircle);
 
 			topCircle.setFill(Color.WHITE);
 			bottomCircle.setFill(Color.WHITE);
@@ -53,25 +62,44 @@ public class Task extends TaskBase {
 			bottomCircle.setCursor(Cursor.HAND);
 
 			HBox bottomBar = new HBox();
-			final HBox topBar = new HBox();
-			Button edit = new Button("...");
+			final Pane topBar = new Pane();
+			HBox edit = new HBox(2);
+			Circle c1 = new Circle(2);
+			Circle c2 = new Circle(2);
+			Circle c3 = new Circle(2);
+			c1.setFill(Color.WHITE);
+			c2.setFill(Color.WHITE);
+			c3.setFill(Color.WHITE);
+			edit.getChildren().add(c1);
+			edit.getChildren().add(c2);
+			edit.getChildren().add(c3);
 
 			edit.setCursor(Cursor.HAND);
-			edit.setOnAction(new EventHandler() {
+			edit.setOnMouseClicked(new EventHandler() {
 				public void handle(Event event) {
 					Main.getPrimaryStage().getScene().setRoot(Main.generateTaskForm(e));
 				}
 			});
 
-			topBar.getChildren().add(edit);
+			edit.setAlignment(Pos.CENTER);
 
 			topBar.setMinHeight(15);
 			bottomBar.setMinHeight(15);
+			edit.setMinHeight(15);
+
+			topBar.setMaxHeight(15);
+			bottomBar.setMaxHeight(15);
+			edit.setMaxHeight(15);
 
 			topBar.getChildren().add(topCircle);
+			topBar.getChildren().add(edit);
+
+			topCircle.setLayoutX(75);
+			topCircle.setLayoutY(7.5);
+			edit.setLayoutX(125);
+
 			bottomBar.getChildren().add(bottomCircle);
 
-			topBar.setAlignment(Pos.CENTER);
 			bottomBar.setAlignment(Pos.CENTER);
 
 			topBar.setCursor(Cursor.OPEN_HAND);
@@ -103,15 +131,13 @@ public class Task extends TaskBase {
 						Main.getDependencyParent().addDependency(e);
 						Main.getSession().save(Main.getDependencyParent());
 
-						Arrow dependency = new Arrow(Main.getDependencyParent().getX() + 75,
-								Main.getDependencyParent().getY() + 93, e.getX() + 73, e.getY() + 8);
+						Line dependency = new Line();
+
 						dependency.setStrokeWidth(3);
 						dependency.setStroke(Color.BLACK);
-						Main.getWorkspace().getChildren().add(dependency.getLines()[0]);
-						Main.getWorkspace().getChildren().add(dependency.getLines()[1]);
-						Main.getWorkspace().getChildren().add(dependency.getLines()[2]);
-						Main.getDependencyParent().getStartArrows().add(dependency);
-						e.getEndArrows().add(dependency);
+						Main.getWorkspace().getChildren().add(dependency);
+						Main.getDependencyParent().addStartLine(dependency);
+						e.addEndLine(dependency);
 
 						Main.setDependencyInit(false);
 					}
@@ -133,14 +159,7 @@ public class Task extends TaskBase {
 					e.setY(ret.getLayoutY() + deltaY);
 					mouse[0] = mouseEvent.getSceneX();
 					mouse[1] = mouseEvent.getSceneY();
-					for (Arrow start : e.getStartArrows()) {
-						start.setStartX(e.getX() + 75);
-						start.setStartY(e.getY() + 93);
-					}
-					for (Arrow end : e.getEndArrows()) {
-						end.setEndX(e.getX() + 75);
-						end.setEndY(e.getY() + 8);
-					}
+					updateLines();
 				}
 			});
 			topBar.setOnMouseReleased(new EventHandler<MouseEvent>() {
@@ -149,21 +168,25 @@ public class Task extends TaskBase {
 					Main.getSession().save(e);
 				}
 			});
-
-			Label title = new Label(e.getTitle());
-			title.setFont(new Font(16));
-			title.setWrapText(true);
-			setTitlePointer(title);
-
-			Label description = new Label(e.getDescription());
-			description.setFont(new Font(12));
-			description.setWrapText(true);
-			setDescriptionPointer(description);
-
 			VBox content = new VBox();
 
+			Label title = new Label(e.getTitle());
+			title.setFont(new Font(15));
+			title.setWrapText(true);
+			setTitlePointer(title);
 			content.getChildren().add(title);
-			content.getChildren().add(description);
+
+			ScrollPane descScroll = new ScrollPane();
+			descScroll.setMaxWidth(150);
+			descScroll.setMinHeight(50);
+			descScroll.setMaxHeight(50);
+			Label description = new Label(e.getDescription());
+			description.setFont(new Font(11));
+			description.setWrapText(true);
+			setDescriptionPointer(description);
+			descScroll.setContent(description);
+			descScroll.setFitToWidth(true);
+			content.getChildren().add(descScroll);
 
 			ret.setTop(topBar);
 			ret.setCenter(content);
@@ -177,7 +200,6 @@ public class Task extends TaskBase {
 			ret.setLayoutY(e.getY());
 
 			ret.setPrefWidth(150);
-			ret.setMinHeight(100);
 			setPane(ret);
 			return ret;
 		} else {

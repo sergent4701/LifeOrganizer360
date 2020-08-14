@@ -1,5 +1,7 @@
 package com.lifeorganizer360;
 
+import java.time.LocalDateTime;
+
 import org.neo4j.ogm.annotation.*;
 
 import javafx.event.Event;
@@ -8,10 +10,12 @@ import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
@@ -26,12 +30,13 @@ public class Goal extends TaskBase {
 		super();
 	}
 
-	protected Goal(String title, String description, double xPos, double yPos) {
-		super(title, description, xPos, yPos);
+	protected Goal(String title, String description, double award, double penalty, LocalDateTime start,
+			LocalDateTime end, double xPos, double yPos) {
+		super(title, description, award, penalty, start, end, xPos, yPos);
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public Node getPane() {
+	public Pane getPane() {
 		if (super.getPane() == null) {
 			TaskBase e = this;
 			final BorderPane ret = new BorderPane();
@@ -44,30 +49,48 @@ public class Goal extends TaskBase {
 			ret.setEffect(ds);
 
 			Circle bottomCircle = new Circle(4);
+			setBottom(bottomCircle);
 
 			bottomCircle.setFill(Color.WHITE);
 			bottomCircle.setCursor(Cursor.HAND);
 
 			HBox bottomBar = new HBox();
-			final HBox topBar = new HBox();
+			final Pane topBar = new Pane();
 
-			Button edit = new Button("...");
+			HBox edit = new HBox(2);
+			Circle c1 = new Circle(2);
+			Circle c2 = new Circle(2);
+			Circle c3 = new Circle(2);
+			c1.setFill(Color.WHITE);
+			c2.setFill(Color.WHITE);
+			c3.setFill(Color.WHITE);
+			edit.getChildren().add(c1);
+			edit.getChildren().add(c2);
+			edit.getChildren().add(c3);
 
 			edit.setCursor(Cursor.HAND);
-			edit.setOnAction(new EventHandler() {
+			edit.setOnMouseClicked(new EventHandler() {
 				public void handle(Event event) {
 					Main.getPrimaryStage().getScene().setRoot(Main.generateTaskForm(e));
 				}
 			});
 
-			topBar.getChildren().add(edit);
+			edit.setAlignment(Pos.CENTER);
 
 			topBar.setMinHeight(15);
 			bottomBar.setMinHeight(15);
+			edit.setMinHeight(15);
+
+			topBar.setMaxHeight(15);
+			bottomBar.setMaxHeight(15);
+			edit.setMaxHeight(15);
+
+			topBar.getChildren().add(edit);
+
+			edit.setLayoutX(125);
 
 			bottomBar.getChildren().add(bottomCircle);
 
-			topBar.setAlignment(Pos.CENTER);
 			bottomBar.setAlignment(Pos.CENTER);
 
 			topBar.setCursor(Cursor.OPEN_HAND);
@@ -96,14 +119,7 @@ public class Goal extends TaskBase {
 					e.setY(ret.getLayoutY() + deltaY);
 					mouse[0] = mouseEvent.getSceneX();
 					mouse[1] = mouseEvent.getSceneY();
-					for (Arrow start : e.getStartArrows()) {
-						start.setStartX(e.getX() + 75);
-						start.setStartY(e.getY() + 93);
-					}
-					for (Arrow end : e.getEndArrows()) {
-						end.setEndX(e.getX() + 75);
-						end.setEndY(e.getY() + 8);
-					}
+					updateLines();
 				}
 			});
 			topBar.setOnMouseReleased(new EventHandler<MouseEvent>() {
@@ -113,20 +129,25 @@ public class Goal extends TaskBase {
 				}
 			});
 
-			Label title = new Label(e.getTitle());
-			title.setFont(new Font(16));
-			title.setWrapText(true);
-			setTitlePointer(title);
-
-			Label description = new Label(e.getDescription());
-			description.setFont(new Font(12));
-			description.setWrapText(true);
-			setDescriptionPointer(description);
-
 			VBox content = new VBox();
 
+			Label title = new Label(e.getTitle());
+			title.setFont(new Font(15));
+			title.setWrapText(true);
+			setTitlePointer(title);
 			content.getChildren().add(title);
-			content.getChildren().add(description);
+
+			ScrollPane descScroll = new ScrollPane();
+			descScroll.setMaxWidth(150);
+			descScroll.setMinHeight(50);
+			descScroll.setMaxHeight(50);
+			Label description = new Label(e.getDescription());
+			description.setFont(new Font(11));
+			description.setWrapText(true);
+			setDescriptionPointer(description);
+			descScroll.setContent(description);
+			descScroll.setFitToWidth(true);
+			content.getChildren().add(descScroll);
 
 			ret.setTop(topBar);
 			ret.setCenter(content);
@@ -140,7 +161,6 @@ public class Goal extends TaskBase {
 			ret.setLayoutY(e.getY());
 
 			ret.setPrefWidth(150);
-			ret.setMinHeight(100);
 			setPane(ret);
 			return ret;
 		} else {
