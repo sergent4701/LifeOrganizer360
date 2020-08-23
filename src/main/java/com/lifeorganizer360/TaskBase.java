@@ -41,19 +41,7 @@ public abstract class TaskBase {
 	private boolean complete = false;
 
 	@Property
-	private double award, penalty;
-
-	@Property
-	private LocalDateTime start, end;
-
-	@Property
-	private int difficulty, focus, anxiety, frustration, workPace;
-
-	@Property
-	private double adjustedAward, adjustedPenalty;
-
-	@Property
-	private LocalDateTime realStart, realEnd;
+	private double progress;
 
 	@Property
 	private boolean busyWork;
@@ -80,28 +68,13 @@ public abstract class TaskBase {
 
 	}
 
-	protected TaskBase(String title, String description, double award, double penalty, LocalDateTime start,
-			LocalDateTime end, double xPos, double yPos) {
+	protected TaskBase(String title, String description, double xPos, double yPos) {
 		this.title = title;
 		this.description = description;
-		this.award = award;
-		this.penalty = penalty;
-		this.start = start;
-		this.end = end;
 		this.xPos = xPos;
 		this.yPos = yPos;
 	}
-
-	public void save(String title, String description, double award, double penalty, LocalDateTime start,
-			LocalDateTime end) {
-		this.title = title;
-		this.description = description;
-		this.award = award;
-		this.penalty = penalty;
-		this.start = start;
-		this.end = end;
-	}
-
+	
 	public Pane getPane() {
 		return pane;
 	};
@@ -120,38 +93,6 @@ public abstract class TaskBase {
 
 	public String getDescription() {
 		return description;
-	}
-
-	public double getAward() {
-		return award;
-	}
-
-	public double getPenalty() {
-		return penalty;
-	}
-
-	public LocalDateTime getStart() {
-		return start;
-	}
-
-	public LocalDateTime getEnd() {
-		return end;
-	}
-
-	public void setAward(double a) {
-		award = a;
-	}
-
-	public void setPenalty(double p) {
-		penalty = p;
-	}
-
-	public void setStart(LocalDateTime s) {
-		start = s;
-	}
-
-	public void setEnd(LocalDateTime e) {
-		end = e;
 	}
 
 	public void setTitle(String t) {

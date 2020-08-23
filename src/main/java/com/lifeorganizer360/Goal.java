@@ -30,9 +30,8 @@ public class Goal extends TaskBase {
 		super();
 	}
 
-	protected Goal(String title, String description, double award, double penalty, LocalDateTime start,
-			LocalDateTime end, double xPos, double yPos) {
-		super(title, description, award, penalty, start, end, xPos, yPos);
+	protected Goal(String title, String description, double xPos, double yPos) {
+		super(title, description, xPos, yPos);
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })

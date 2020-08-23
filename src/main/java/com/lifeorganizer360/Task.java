@@ -28,13 +28,32 @@ import javafx.scene.shape.Line;
 @NodeEntity
 public class Task extends TaskBase {
 
+	@Property
+	private double award, penalty;
+
+	@Property
+	private LocalDateTime start, end;
+
+	@Property
+	private int difficulty, focus, anxiety, frustration, workPace;
+
+	@Property
+	private double adjustedAward, adjustedPenalty;
+
+	@Property
+	private LocalDateTime realStart, realEnd;
+
 	protected Task() {
 		super();
 	}
 
 	protected Task(String title, String description, double award, double penalty, LocalDateTime start,
 			LocalDateTime end, double xPos, double yPos) {
-		super(title, description, award, penalty, start, end, xPos, yPos);
+		super(title, description, xPos, yPos);
+		this.start = start;
+		this.end = end;
+		this.award = award;
+		this.penalty = penalty;
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
@@ -205,6 +224,38 @@ public class Task extends TaskBase {
 		} else {
 			return super.getPane();
 		}
+	}
+
+	public double getAward() {
+		return award;
+	}
+
+	public double getPenalty() {
+		return penalty;
+	}
+
+	public LocalDateTime getStart() {
+		return start;
+	}
+
+	public LocalDateTime getEnd() {
+		return end;
+	}
+
+	public void setAward(double a) {
+		award = a;
+	}
+
+	public void setPenalty(double p) {
+		penalty = p;
+	}
+
+	public void setStart(LocalDateTime s) {
+		start = s;
+	}
+
+	public void setEnd(LocalDateTime e) {
+		end = e;
 	}
 
 }

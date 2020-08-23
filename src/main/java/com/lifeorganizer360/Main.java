@@ -294,14 +294,20 @@ public class Main extends Application {
 		taskForm.getChildren().add(backBtn);
 		if (t == null)
 			taskForm.getChildren().add(dropdown);
-		taskForm.getChildren().addAll(titleV, descV, apContainer, seContainer, submitBtn);
+		taskForm.getChildren().addAll(titleV, descV);
+		if (t instanceof Task || t == null)
+			taskForm.getChildren().addAll(apContainer, seContainer);
+
+		taskForm.getChildren().add(submitBtn);
 
 		dropdown.getSelectionModel().selectedItemProperty().addListener((options, oldValue, newValue) -> {
 			switch (newValue) {
 			case "Goal":
-				
+				taskForm.getChildren().removeAll(apContainer, seContainer);
 				break;
 			case "Task":
+				taskForm.getChildren().removeAll(submitBtn);
+				taskForm.getChildren().addAll(apContainer, seContainer, submitBtn);
 				break;
 			}
 		});
@@ -309,10 +315,13 @@ public class Main extends Application {
 		if (t != null) {
 			titleF.setText(t.getTitle());
 			descF.setText(t.getDescription());
-			awardF.setText(t.getAward() + "");
-			penaltyF.setText(t.getPenalty() + "");
-			startF.setDateTimeValue(t.getStart());
-			endF.setDateTimeValue(t.getEnd());
+			if (t instanceof Task) {
+				Task temp = (Task) t;
+				awardF.setText(temp.getAward() + "");
+				penaltyF.setText(temp.getPenalty() + "");
+				startF.setDateTimeValue(temp.getStart());
+				endF.setDateTimeValue(temp.getEnd());
+			}
 
 			Button delBtn = new Button("Delete");
 			delBtn.setOnAction(new EventHandler() {
@@ -345,9 +354,7 @@ public class Main extends Application {
 							TaskBase x = t;
 							switch (dropdown.getValue()) {
 							case "Goal":
-								x = new Goal(titleF.getText(), descF.getText(), Double.parseDouble(awardF.getText()),
-										Double.parseDouble(penaltyF.getText()), startF.getDateTimeValue(),
-										endF.getDateTimeValue(), e.getX(), e.getY());
+								x = new Goal(titleF.getText(), descF.getText(), e.getX(), e.getY());
 								break;
 							case "Task":
 								x = new Task(titleF.getText(), descF.getText(), Double.parseDouble(awardF.getText()),
@@ -366,8 +373,16 @@ public class Main extends Application {
 
 					workspace.addEventFilter(MouseEvent.MOUSE_CLICKED, filter);
 				} else {
-					t.save(titleF.getText(), descF.getText(), Double.parseDouble(awardF.getText()),
-							Double.parseDouble(penaltyF.getText()), startF.getDateTimeValue(), endF.getDateTimeValue());
+					t.setTitle(titleF.getText());
+					t.setDescription(descF.getText());
+					if(t instanceof Task) {
+						Task temp=(Task)t;
+						temp.setAward(Double.parseDouble(awardF.getText()));
+						temp.setPenalty(Double.parseDouble(penaltyF.getText()));
+						temp.setStart(startF.getDateTimeValue());
+						temp.setEnd(endF.getDateTimeValue());
+					}
+		
 					session.save(t);
 				}
 
