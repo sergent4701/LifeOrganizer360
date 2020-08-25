@@ -121,7 +121,7 @@ public class Main extends Application {
 
 		addBtn.setOnAction(new EventHandler() {
 			public void handle(Event event) {
-				scene.setRoot(generateTaskForm());
+				scene.setRoot(new CreateTaskForm(CreateTaskForm.WORKSPACE));
 			}
 		});
 
@@ -144,7 +144,8 @@ public class Main extends Application {
 			public void handle(Event event) {
 				scene.setRoot(workspaceContainer);
 				for (TaskBase e : entities) {
-					workspace.getChildren().add(e.getPane());
+					if (!e.isHidden())
+						workspace.getChildren().add(e.getWorkspacePane());
 				}
 				for (TaskBase e : entities) {
 					for (TaskBase d : e.getDependencies()) {
@@ -152,7 +153,8 @@ public class Main extends Application {
 						Line dependency = new Line();
 						dependency.setStrokeWidth(3);
 						dependency.setStroke(Color.BLACK);
-						workspace.getChildren().add(dependency);
+						if (!e.isHidden() && !e.isReceeded())
+							workspace.getChildren().add(dependency);
 						e.addStartLine(dependency);
 						d.addEndLine(dependency);
 
@@ -224,6 +226,10 @@ public class Main extends Application {
 		return workspace;
 	}
 
+	public static VBox getWorkspaceContainer() {
+		return workspaceContainer;
+	}
+
 	public static void setDependencyParent(TaskBase e) {
 		dependencyParent = e;
 	}
@@ -242,165 +248,16 @@ public class Main extends Application {
 		return dependencyParent;
 	}
 
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public static Parent generateTaskForm(final TaskBase t) {
-		VBox taskForm = new VBox(10);
-
-		Button backBtn = new Button("<--");
-
-		final ComboBox<String> dropdown = new ComboBox<String>();
-		dropdown.setPromptText("Select Type");
-		dropdown.getItems().add("Goal");
-		dropdown.getItems().add("Task");
-
-		dropdown.setValue("Task");
-
-		Label titleL = new Label("Title:");
-		final TextField titleF = new TextField();
-		VBox titleV = new VBox(3, titleL, titleF);
-		titleF.setMaxWidth(580);
-
-		Label descL = new Label("Description:");
-		final TextArea descF = new TextArea();
-		VBox descV = new VBox(3, descL, descF);
-		descF.setMaxWidth(580);
-
-		Label awardL = new Label("Award:");
-		final TextField awardF = new TextField();
-		VBox awardV = new VBox(3, awardL, awardF);
-		awardF.setMinWidth(188);
-
-		Label penaltyL = new Label("Penalty:");
-		final TextField penaltyF = new TextField();
-		VBox penaltyV = new VBox(3, penaltyL, penaltyF);
-		penaltyF.setMinWidth(188);
-
-		HBox apContainer = new HBox(10, awardV, penaltyV);
-
-		Label startL = new Label("Start:");
-		final DateTimePicker startF = new DateTimePicker();
-		startF.setFormat("MMM dd, yyyy hh:mm a");
-		VBox startV = new VBox(3, startL, startF);
-
-		Label endL = new Label("End:");
-		final DateTimePicker endF = new DateTimePicker();
-		endF.setFormat("MMM dd, yyyy hh:mm a");
-		VBox endV = new VBox(3, endL, endF);
-
-		HBox seContainer = new HBox(10, startV, endV);
-
-		Button submitBtn = new Button("Submit");
-
-		taskForm.getChildren().add(backBtn);
-		if (t == null)
-			taskForm.getChildren().add(dropdown);
-		taskForm.getChildren().addAll(titleV, descV);
-		if (t instanceof Task || t == null)
-			taskForm.getChildren().addAll(apContainer, seContainer);
-
-		taskForm.getChildren().add(submitBtn);
-
-		dropdown.getSelectionModel().selectedItemProperty().addListener((options, oldValue, newValue) -> {
-			switch (newValue) {
-			case "Goal":
-				taskForm.getChildren().removeAll(apContainer, seContainer);
-				break;
-			case "Task":
-				taskForm.getChildren().removeAll(submitBtn);
-				taskForm.getChildren().addAll(apContainer, seContainer, submitBtn);
-				break;
-			}
-		});
-
-		if (t != null) {
-			titleF.setText(t.getTitle());
-			descF.setText(t.getDescription());
-			if (t instanceof Task) {
-				Task temp = (Task) t;
-				awardF.setText(temp.getAward() + "");
-				penaltyF.setText(temp.getPenalty() + "");
-				startF.setDateTimeValue(temp.getStart());
-				endF.setDateTimeValue(temp.getEnd());
-			}
-
-			Button delBtn = new Button("Delete");
-			delBtn.setOnAction(new EventHandler() {
-				public void handle(Event event) {
-					primaryStage.getScene().setRoot(workspaceContainer);
-					workspace.getChildren().remove(t.getPane());
-					session.delete(session.load(TaskBase.class, t.getId()));
-					entities.remove(t);
-				}
-			});
-			taskForm.getChildren().add(delBtn);
-
-		}
-		backBtn.setOnAction(new EventHandler() {
-			public void handle(Event event) {
-				primaryStage.getScene().setRoot(workspaceContainer);
-			}
-		});
-
-		submitBtn.setOnAction(new EventHandler() {
-			public void handle(Event event) {
-				primaryStage.getScene().setRoot(workspaceContainer);
-
-				if (t == null) {
-					workspace.setCursor(Cursor.CROSSHAIR);
-
-					final EventHandler filter = new EventHandler<MouseEvent>() {
-						public void handle(MouseEvent e) {
-							workspace.setCursor(Cursor.DEFAULT);
-							TaskBase x = t;
-							switch (dropdown.getValue()) {
-							case "Goal":
-								x = new Goal(titleF.getText(), descF.getText(), e.getX(), e.getY());
-								break;
-							case "Task":
-								x = new Task(titleF.getText(), descF.getText(), Double.parseDouble(awardF.getText()),
-										Double.parseDouble(penaltyF.getText()), startF.getDateTimeValue(),
-										endF.getDateTimeValue(), e.getX(), e.getY());
-								break;
-							}
-							entities.add(x);
-							workspace.getChildren().add(x.getPane());
-							session.save(x);
-							workspace.removeEventFilter(MouseEvent.MOUSE_CLICKED, this);
-
-						}
-
-					};
-
-					workspace.addEventFilter(MouseEvent.MOUSE_CLICKED, filter);
-				} else {
-					t.setTitle(titleF.getText());
-					t.setDescription(descF.getText());
-					if(t instanceof Task) {
-						Task temp=(Task)t;
-						temp.setAward(Double.parseDouble(awardF.getText()));
-						temp.setPenalty(Double.parseDouble(penaltyF.getText()));
-						temp.setStart(startF.getDateTimeValue());
-						temp.setEnd(endF.getDateTimeValue());
-					}
-		
-					session.save(t);
-				}
-
-			}
-		});
-		return taskForm;
-	}
-
 	public static double getToolBarHeight() {
 		return toolBarHeight;
 	}
 
-	public static Parent generateTaskForm() {
-		return generateTaskForm(null);
-	}
-
 	public static Stage getPrimaryStage() {
 		return primaryStage;
+	}
+
+	public static ArrayList<TaskBase> getEntities() {
+		return entities;
 	}
 
 }
