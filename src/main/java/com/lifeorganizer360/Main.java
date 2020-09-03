@@ -12,8 +12,13 @@ import org.neo4j.driver.TransactionWork;
 
 import static org.neo4j.driver.Values.parameters;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Application;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
@@ -21,7 +26,9 @@ import javafx.event.Event;
 import javafx.event.EventHandler;
 import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 import tornadofx.control.DateTimePicker;
 import javafx.scene.Node;
 import javafx.scene.Parent;
@@ -39,6 +46,7 @@ import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundFill;
 import javafx.scene.layout.CornerRadii;
 import javafx.scene.layout.Pane;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.Cursor;
 import javafx.scene.input.MouseEvent;
@@ -51,9 +59,15 @@ public class Main extends Application {
 	private static final Pane workspace = new Pane();
 	private static Stage primaryStage = null;
 	private static VBox workspaceContainer = new VBox();
-	private static VBox mainContainer = new VBox();
+	private static HBox mainContainer = new HBox();
+	private static Button notificationsBtn;
+	private static Label greeting;
 
 	private static ArrayList<TaskBase> entities;
+	private static ArrayList<Saveable> nodes;
+	private static ArrayList<Notification> notifications;
+	private static ArrayList<WorkTicket> tickets;
+	private static Account user;
 	private static boolean dependencyInit = false;
 	private static TaskBase dependencyParent = null;
 
@@ -63,6 +77,8 @@ public class Main extends Application {
 	private double minimumWindowWidth = 450;
 	private double minimumWindowHeight = 350;
 
+	private static int alertCount = 0;
+
 	private static org.neo4j.driver.Driver nativeDriver = null;
 	private static Driver ogmDriver = null;
 	private static SessionFactory sessionFactory = null;
@@ -70,8 +86,26 @@ public class Main extends Application {
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public void start(final Stage p) {
-		Button startBtn = new Button("Start");
-		mainContainer.getChildren().add(startBtn);
+		Timeline taskTimer = new Timeline(new KeyFrame(Duration.millis(60000), ae -> taskTimer()));
+		taskTimer.play();
+
+		Button workspaceBtn = new Button("Workspace");
+		notificationsBtn = new Button("Notifications (" + alertCount + ")");
+
+		VBox functionalBtns = new VBox(3, workspaceBtn, notificationsBtn);
+
+		Button dailyBtn = new Button("Daily");
+		Button weeklyBtn = new Button("Weekly");
+		Button monthlyBtn = new Button("Monthly");
+		Button yearlyBtn = new Button("Yearly");
+		VBox calendarBtns = new VBox(3, dailyBtn, weeklyBtn, monthlyBtn, yearlyBtn);
+
+		HBox menu = new HBox(5, calendarBtns, functionalBtns);
+
+		Button backBtn = new Button("<");
+
+		mainContainer.getChildren().add(menu);
+		mainContainer.setAlignment(Pos.CENTER);
 
 		primaryStage = p;
 
@@ -81,7 +115,8 @@ public class Main extends Application {
 		Label logo = new Label("Life Organizer 360©");
 		logo.setFont(new Font(25));
 
-		Label greeting = new Label("Welcome Srdjan Bozin!");
+		greeting = new Label("Welcome " + user.getFirstName() + " " + user.getLastName() + ", you have $"
+				+ user.getBalance() + " in your account!");
 		greeting.setFont(new Font(18));
 
 		Button addBtn = new Button("+");
@@ -105,8 +140,7 @@ public class Main extends Application {
 		logoandgreeting.getChildren().add(logo);
 		logoandgreeting.getChildren().add(greeting);
 
-		toolBar.getChildren().add(logoandgreeting);
-		toolBar.getChildren().add(addBtn);
+		toolBar.getChildren().addAll(logoandgreeting, addBtn, backBtn);
 
 		ScrollPane scroll = new ScrollPane();
 		scroll.setContent(workspace);
@@ -122,6 +156,11 @@ public class Main extends Application {
 		addBtn.setOnAction(new EventHandler() {
 			public void handle(Event event) {
 				scene.setRoot(new CreateTaskForm(CreateTaskForm.WORKSPACE));
+			}
+		});
+		backBtn.setOnAction(new EventHandler() {
+			public void handle(Event event) {
+				scene.setRoot(mainContainer);
 			}
 		});
 
@@ -140,7 +179,7 @@ public class Main extends Application {
 			}
 
 		});
-		startBtn.setOnAction(new EventHandler() {
+		workspaceBtn.setOnAction(new EventHandler() {
 			public void handle(Event event) {
 				scene.setRoot(workspaceContainer);
 				for (TaskBase e : entities) {
@@ -160,6 +199,31 @@ public class Main extends Application {
 
 					}
 				}
+			}
+		});
+		notificationsBtn.setOnAction(new EventHandler() {
+			public void handle(Event event) {
+				scene.setRoot(new NotificationDashboard());
+			}
+		});
+		dailyBtn.setOnAction(new EventHandler() {
+			public void handle(Event event) {
+				scene.setRoot(new DailyCalendar(LocalDate.now()));
+			}
+		});
+		weeklyBtn.setOnAction(new EventHandler() {
+			public void handle(Event event) {
+				scene.setRoot(new WeeklyCalendar(LocalDate.now()));
+			}
+		});
+		monthlyBtn.setOnAction(new EventHandler() {
+			public void handle(Event event) {
+				scene.setRoot(new MonthlyCalendar(LocalDate.now()));
+			}
+		});
+		yearlyBtn.setOnAction(new EventHandler() {
+			public void handle(Event event) {
+				scene.setRoot(new YearlyCalendar(LocalDate.now()));
 			}
 		});
 
@@ -215,7 +279,24 @@ public class Main extends Application {
 	}
 
 	public static void loadNodes() {
-		entities = new ArrayList<TaskBase>(session.loadAll(TaskBase.class, -1));
+		nodes = new ArrayList<Saveable>(session.loadAll(Saveable.class, -1));
+		entities = new ArrayList<TaskBase>();
+		notifications = new ArrayList<Notification>();
+		tickets = new ArrayList<WorkTicket>();
+		for (Saveable s : nodes)
+			if (s instanceof TaskBase)
+				entities.add((TaskBase) s);
+			else if (s instanceof Notification) {
+				if (((Notification) s).isAlert())
+					alertCount++;
+				notifications.add((Notification) s);
+			} else if (s instanceof WorkTicket && ((WorkTicket) s).getTask() != null)
+				tickets.add((WorkTicket) s);
+			else if (s instanceof Account)
+				user = (Account) s;
+		if (user == null)
+			user = new Account("Srdjan", "Bozin");
+
 	}
 
 	public static void setDependencyInit(boolean b) {
@@ -258,6 +339,67 @@ public class Main extends Application {
 
 	public static ArrayList<TaskBase> getEntities() {
 		return entities;
+	}
+
+	public static ArrayList<Notification> getNotifications() {
+		return notifications;
+	}
+
+	public static ArrayList<WorkTicket> getTickets() {
+		return tickets;
+	}
+
+	public static void addTicket(WorkTicket t) {
+		tickets.add(t);
+	}
+
+	public static void addNotification(Notification n) {
+		notifications.add(n);
+		notificationsBtn.setText("Notifications (" + (++alertCount) + ")");
+	}
+
+	public static void deleteTicket(WorkTicket t) {
+		tickets.remove(t);
+	}
+
+	public static HBox getMainContainer() {
+		return mainContainer;
+	}
+
+	private void taskTimer() {
+
+		for (WorkTicket t : tickets) {
+			if (t instanceof RecurringTicket) {
+				RecurringTicket r = (RecurringTicket) t;
+				for (WorkTicket sub : r.getTickets()) {
+					if (sub.getStatus().equals(WorkTicket.INPROGRESS)
+							&& sub.getEnd().compareTo(LocalDateTime.now()) < 0) {
+						sub.setStatus(WorkTicket.REQUIRESACTION);
+						new WorkTicketProcess(sub, r.getTask());
+					}
+				}
+
+			} else if (t.getStatus().equals(WorkTicket.INPROGRESS) && t.getEnd().compareTo(LocalDateTime.now()) < 0) {
+				t.setStatus(WorkTicket.REQUIRESACTION);
+				new WorkTicketProcess(t);
+			}
+		}
+
+		Timeline taskTimer = new Timeline(new KeyFrame(Duration.millis(60000), ae -> taskTimer()));
+		taskTimer.play();
+	}
+
+	public static void subAlert() {
+		notificationsBtn.setText("Notifications (" + (--alertCount) + ")");
+	}
+
+	public static Account getUser() {
+		return user;
+	}
+
+	public static void updateBalance() {
+		greeting.setText("Welcome " + user.getFirstName() + " " + user.getLastName() + ", you have $"
+				+ user.getBalance() + " in your account!");
 	}
 
 }

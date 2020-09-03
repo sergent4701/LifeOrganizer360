@@ -1,6 +1,7 @@
 package com.lifeorganizer360;
 
 import java.time.LocalDateTime;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Set;
@@ -34,40 +35,25 @@ public class Task extends TaskBase {
 	@Property
 	private double award, penalty;
 
-	@Property
-	private LocalDateTime start, end;
-
-	@Property
-	private int difficulty, focus, anxiety, frustration, workPace;
-
-	@Property
-	private double adjustedAward, adjustedPenalty;
-
-	@Property
-	private LocalDateTime realStart, realEnd;
-
 	@Transient
 	private ArrayList<Node> receededListItems = new ArrayList<Node>();
+
+	@Relationship(type = "TICKET", direction = Relationship.OUTGOING)
+	private ArrayList<WorkTicket> tickets = new ArrayList<WorkTicket>();
 
 	protected Task() {
 		super();
 	}
 
-	protected Task(String title, String description, double award, double penalty, LocalDateTime start,
-			LocalDateTime end, double xPos, double yPos) {
+	protected Task(String title, String description, double award, double penalty, double xPos, double yPos) {
 		super(title, description, xPos, yPos);
-		this.start = start;
-		this.end = end;
 		this.award = award;
 		this.penalty = penalty;
 		save();
 	}
 
-	protected Task(String title, String description, double award, double penalty, LocalDateTime start,
-			LocalDateTime end) {
+	protected Task(String title, String description, double award, double penalty) {
 		super(title, description, 0, 0);
-		this.start = start;
-		this.end = end;
 		this.award = award;
 		this.penalty = penalty;
 		setHidden(true);
@@ -419,14 +405,6 @@ public class Task extends TaskBase {
 		return penalty;
 	}
 
-	public LocalDateTime getStart() {
-		return start;
-	}
-
-	public LocalDateTime getEnd() {
-		return end;
-	}
-
 	public void setAward(double a) {
 		award = a;
 		save();
@@ -434,16 +412,6 @@ public class Task extends TaskBase {
 
 	public void setPenalty(double p) {
 		penalty = p;
-		save();
-	}
-
-	public void setStart(LocalDateTime s) {
-		start = s;
-		save();
-	}
-
-	public void setEnd(LocalDateTime e) {
-		end = e;
 		save();
 	}
 
@@ -483,12 +451,6 @@ public class Task extends TaskBase {
 		Label start = new Label();
 		Label end = new Label();
 
-		if (getStart() != null)
-			start = new Label(getStart().toString());
-
-		if (getEnd() != null)
-			end = new Label(getEnd().toString());
-
 		cols[0].getChildren().addAll(title, description);
 		cols[1].getChildren().addAll(award, penalty);
 		cols[2].getChildren().addAll(start, end);
@@ -501,6 +463,12 @@ public class Task extends TaskBase {
 
 				Iterator<Line> iter = parent.getStartLines().iterator();
 				Iterator<Line> iter2 = t.getEndLines().iterator();
+				((VBox) parent.getReceededList().getContent()).getChildren()
+						.removeAll(((Task) t).getReceededListItems());
+
+				if (parent.isReceeded() && t.getDepedenciesOf().isEmpty()) {
+					t.setHidden(false);
+				}
 
 				while (iter.hasNext()) {
 					Line start = iter.next();
@@ -523,9 +491,9 @@ public class Task extends TaskBase {
 
 		taskContent.setLayoutX(masterOffset + level * 30);
 		taskContent.setLayoutY(10);
-		
+
 		taskContent.setCursor(Cursor.HAND);
-		
+
 		taskContent.setOnMouseClicked(new EventHandler() {
 			public void handle(Event event) {
 				Main.getPrimaryStage().getScene().setRoot(getProfilePane());
@@ -579,4 +547,17 @@ public class Task extends TaskBase {
 		return container;
 	}
 
+	public ArrayList<WorkTicket> getTickets() {
+		return tickets;
+	}
+
+	public void addTicket(WorkTicket t) {
+		tickets.add(t);
+		save();
+	}
+
+	public void deleteTicket(WorkTicket t) {
+		tickets.remove(t);
+		save();
+	}
 }

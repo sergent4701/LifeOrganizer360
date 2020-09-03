@@ -8,9 +8,12 @@ import javafx.beans.value.ObservableValue;
 import javafx.event.Event;
 import javafx.event.EventHandler;
 import javafx.geometry.Bounds;
+import javafx.geometry.Pos;
 import javafx.scene.layout.Pane;
 import javafx.scene.Cursor;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
@@ -19,9 +22,11 @@ import javafx.scene.control.TextField;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Line;
+import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import tornadofx.control.DateTimePicker;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.scene.layout.HBox;
 
 import org.neo4j.ogm.annotation.GeneratedValue;
@@ -33,19 +38,16 @@ import org.neo4j.ogm.annotation.Transient;
 
 @SuppressWarnings({ "restriction", "unchecked", "rawtypes" })
 @NodeEntity
-public abstract class TaskBase {
-	@Id
-	@GeneratedValue
-	private Long id;
+public abstract class TaskBase extends Saveable {
 
 	@Property
-	private double xPos, yPos, progress;
+	private double xPos, yPos, progress = -1;
 
 	@Property
 	private String title, description;
 
 	@Property
-	private boolean complete = false, busyWork, collapsed, receeded, hidden;
+	private boolean active = true, collapsed, receeded, hidden;
 
 	@Relationship(type = "DEPENDS_ON", direction = Relationship.OUTGOING)
 	private ArrayList<Task> dependencies = new ArrayList<Task>();
@@ -67,6 +69,9 @@ public abstract class TaskBase {
 
 	@Transient
 	private Label titlePointer, descriptionPointer;
+
+	@Transient
+	private Pane completionBar = new Pane();
 
 	protected TaskBase() {
 
@@ -241,10 +246,6 @@ public abstract class TaskBase {
 		return endLines;
 	}
 
-	public long getId() {
-		return id;
-	}
-
 	public void setPane(Pane n) {
 		workspacePane = n;
 	}
@@ -287,18 +288,14 @@ public abstract class TaskBase {
 		endLines.add(a);
 	}
 
-	public void save() {
-		Main.getSession().save(this);
-	}
-
 	public HBox getProfilePane() {
-		TaskBase t = this;
+		TaskBase a = this;
 		HBox ret = new HBox();
 		ScrollPane scrollDependencies = new ScrollPane();
 		VBox dependencyList = new VBox(3);
 		scrollDependencies.setContent(dependencyList);
-		for (Task t : dependencies) {
-			dependencyList.getChildren().add(t.generateDropdownListItem(this));
+		for (Task x : dependencies) {
+			dependencyList.getChildren().add(x.generateDropdownListItem(this));
 		}
 		Button addBtn = new Button("Add");
 		addBtn.setPrefWidth(600);
@@ -306,7 +303,7 @@ public abstract class TaskBase {
 
 		addBtn.setOnAction(new EventHandler() {
 			public void handle(Event event) {
-				Main.getPrimaryStage().getScene().setRoot(new CreateTaskForm(CreateTaskForm.PROFILE, t));
+				Main.getPrimaryStage().getScene().setRoot(new CreateTaskForm(CreateTaskForm.PROFILE, a));
 			}
 		});
 
@@ -336,17 +333,21 @@ public abstract class TaskBase {
 
 		HBox apContainer = new HBox(10, awardV, penaltyV);
 
-		Label startL = new Label("Start:");
-		final DateTimePicker startF = new DateTimePicker();
-		startF.setFormat("MMM dd, yyyy hh:mm a");
-		VBox startV = new VBox(3, startL, startF);
+		Label ticketsL = new Label("Tickets:");
+		Button addTicket = new Button("Add");
 
-		Label endL = new Label("End:");
-		final DateTimePicker endF = new DateTimePicker();
-		endF.setFormat("MMM dd, yyyy hh:mm a");
-		VBox endV = new VBox(3, endL, endF);
+		VBox ticketList = new VBox(5);
 
-		HBox seContainer = new HBox(10, startV, endV);
+		ArrayList<Node> justAdded = new ArrayList<Node>();
+		addTicket.setOnAction(new EventHandler() {
+			public void handle(Event event) {
+				Pane temp = CreateTaskForm.createTicketItem();
+				justAdded.add(temp);
+				ticketList.getChildren().add(temp);
+			}
+		});
+
+		VBox ticketContainer = new VBox(ticketsL, ticketList, addTicket);
 
 		Button submitBtn = new Button("Submit");
 
@@ -357,13 +358,14 @@ public abstract class TaskBase {
 		titleF.setText(title);
 		descF.setText(description);
 
-		if (t instanceof Task) {
-			taskForm.getChildren().addAll(apContainer, seContainer);
+		if (a instanceof Task) {
+			taskForm.getChildren().addAll(apContainer, ticketContainer);
 			Task temp = (Task) this;
 			awardF.setText(temp.getAward() + "");
 			penaltyF.setText(temp.getPenalty() + "");
-			startF.setDateTimeValue(temp.getStart());
-			endF.setDateTimeValue(temp.getEnd());
+			for (WorkTicket t : Main.getTickets())
+				if (t.getTask().equals(temp))
+					ticketList.getChildren().add(CreateTaskForm.createTicketItem(t));
 		}
 
 		taskForm.getChildren().add(submitBtn);
@@ -373,8 +375,8 @@ public abstract class TaskBase {
 			public void handle(Event event) {
 				Main.getPrimaryStage().getScene().setRoot(Main.getWorkspaceContainer());
 				Main.getWorkspace().getChildren().remove(workspacePane);
-				Main.getSession().delete(Main.getSession().load(TaskBase.class, id));
-				Main.getEntities().remove(t);
+				delete();
+				Main.getEntities().remove(a);
 				for (Line start : startLines) {
 					if (Main.getWorkspace().getChildren().contains(start))
 						Main.getWorkspace().getChildren().remove(start);
@@ -384,15 +386,15 @@ public abstract class TaskBase {
 						Main.getWorkspace().getChildren().remove(end);
 				}
 				for (Task child : dependencies) {
-					child.getDepedenciesOf().remove(t);
+					child.getDepedenciesOf().remove(a);
 					child.getEndLines().removeAll(startLines);
 				}
 				for (TaskBase parent : dependenciesOf) {
-					parent.getDependencies().remove(t);
+					parent.getDependencies().remove(a);
 					parent.getStartLines().removeAll(endLines);
-					if (t instanceof Task)
+					if (a instanceof Task)
 						((VBox) parent.getReceededList().getContent()).getChildren()
-								.removeAll(((Task) t).getReceededListItems());
+								.removeAll(((Task) a).getReceededListItems());
 
 				}
 			}
@@ -408,15 +410,40 @@ public abstract class TaskBase {
 		submitBtn.setOnAction(new EventHandler() {
 			public void handle(Event event) {
 				Main.getPrimaryStage().getScene().setRoot(Main.getWorkspaceContainer());
+				for (Node n : justAdded) {
+					WorkTicket t = null;
+					VBox v = (VBox) n;
+					LocalDateTime start = ((DateTimePicker) ((VBox) ((HBox) v.getChildren().get(0)).getChildren()
+							.get(0)).getChildren().get(1)).getDateTimeValue();
+					LocalDateTime end = ((DateTimePicker) ((VBox) ((HBox) v.getChildren().get(0)).getChildren().get(1))
+							.getChildren().get(1)).getDateTimeValue();
+					if (((CheckBox) ((VBox) v.getChildren().get(1)).getChildren().get(0)).isSelected()) {
+						String type = (String) ((ComboBox) ((VBox) v.getChildren().get(1)).getChildren().get(1))
+								.getValue();
+						LocalDateTime stopDate = ((DateTimePicker) ((VBox) ((VBox) v.getChildren().get(1)).getChildren()
+								.get(2)).getChildren().get(1)).getDateTimeValue();
+						if (type.equals(RecurringTicket.WEEKLY)) {
+							HBox daysContainer = (HBox) ((VBox) v.getChildren().get(1)).getChildren().get(3);
+							boolean[] days = new boolean[7];
+							for (int i = 0; i < 7; i++) {
+								days[i] = ((CheckBox) daysContainer.getChildren().get(i)).isSelected();
+							}
+							t = new RecurringTicket((Task) a, start, end, stopDate, type, days);
+						} else
+							t = new RecurringTicket((Task) a, start, end, stopDate, type);
+					} else
+						t = new WorkTicket((Task) a, start, end);
+					((Task) a).addTicket(t);
+					Main.addTicket(t);
+					t.save();
+				}
 
 				setTitle(titleF.getText());
 				setDescription(descF.getText());
-				if (t instanceof Task) {
-					Task temp = (Task) t;
+				if (a instanceof Task) {
+					Task temp = (Task) a;
 					temp.setAward(Double.parseDouble(awardF.getText()));
 					temp.setPenalty(Double.parseDouble(penaltyF.getText()));
-					temp.setStart(startF.getDateTimeValue());
-					temp.setEnd(endF.getDateTimeValue());
 
 				}
 
