@@ -201,17 +201,15 @@ public class DailyCalendar extends VBox {
 				if (t.getStart().getHour() == t.getEnd().getHour()) {
 					rect.setHeight(t.getDuration());
 
-					currentCell.getChildren().addAll(getTop(rect, color), getBottom(rect, color),
-							getLeft(rect, color), getRight(rect, color));
+					currentCell.getChildren().addAll(getTop(rect, color), getBottom(rect, color), getLeft(rect, color),
+							getRight(rect, color));
 				} else {
 					rect.setHeight(60 - t.getStart().getMinute());
-					currentCell.getChildren().addAll(getTop(rect, color), getLeft(rect, color),
-							getRight(rect, color));
+					currentCell.getChildren().addAll(getTop(rect, color), getLeft(rect, color), getRight(rect, color));
 				}
 			} else if (includeEnd && i == t.getEnd().getHour()) {
 				rect.setHeight(t.getEnd().getMinute());
-				currentCell.getChildren().addAll(getBottom(rect, color), getLeft(rect, color),
-						getRight(rect, color));
+				currentCell.getChildren().addAll(getBottom(rect, color), getLeft(rect, color), getRight(rect, color));
 			} else {
 				rect.setHeight(60);
 				currentCell.getChildren().addAll(getLeft(rect, color), getRight(rect, color));
@@ -221,6 +219,11 @@ public class DailyCalendar extends VBox {
 				public void handle(MouseEvent mouseEvent) {
 					((HBox) getChildren().get(1)).getChildren().remove(3);
 					((HBox) getChildren().get(1)).getChildren().add(generateDisplayMenu(task, t));
+				}
+			});
+			rect.setOnMouseClicked(new EventHandler<MouseEvent>() {
+				public void handle(MouseEvent mouseEvent) {
+					Main.getPrimaryStage().getScene().setRoot(task.getProfilePane());
 				}
 			});
 			currentCell.getChildren().add(rect);

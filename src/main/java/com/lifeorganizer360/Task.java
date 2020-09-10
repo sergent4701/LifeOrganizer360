@@ -589,12 +589,13 @@ public class Task extends TaskBase {
 
 		for (WorkTicket w : getTickets()) {
 
-			if (w instanceof RecurringTicket)
+			if (w instanceof RecurringTicket) {
+				System.out.print(((RecurringTicket) w).getTickets().size());
 				for (WorkTicket sub : ((RecurringTicket) w).getTickets()) {
 					if (sub.getStatus().equals(WorkTicket.INPROGRESS))
 						notify = false;
 				}
-			else if (w.getStatus().equals(WorkTicket.INPROGRESS))
+			} else if (w.getStatus().equals(WorkTicket.INPROGRESS))
 				notify = false;
 
 		}

@@ -347,7 +347,6 @@ public abstract class TaskBase extends Saveable {
 
 		ColorPicker colorPicker = new ColorPicker();
 		colorPicker.getCustomColors().addAll(Task.colors);
-		colorPicker.setValue(((Task) a).getColor());
 
 		Label ticketsL = new Label("Tickets:");
 		Button addTicket = new Button("Add");
@@ -375,6 +374,7 @@ public abstract class TaskBase extends Saveable {
 		descF.setText(description);
 
 		if (a instanceof Task) {
+			colorPicker.setValue(((Task) a).getColor());
 			taskForm.getChildren().addAll(apContainer, colorPicker, ticketContainer);
 			Task temp = (Task) this;
 			awardF.setText(temp.getAward() + "");
