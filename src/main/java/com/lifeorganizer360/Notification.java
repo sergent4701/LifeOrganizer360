@@ -42,10 +42,14 @@ public class Notification extends Saveable implements Comparable {
 		save();
 	}
 
+	public void delete() {
+		Main.deleteNotification(this);
+		super.delete();
+	}
+
 	public void setAlert(boolean b) {
-		if(!b)
-			Main.subAlert();
 		alert = b;
+		Main.updateNotifications();
 		save();
 	}
 

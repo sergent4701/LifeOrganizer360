@@ -33,16 +33,16 @@ public class Account extends Saveable {
 		return currentBalance;
 	}
 
-	public void award(double a) {
-		new awardPenaltyNotification(a);
+	public void award(double a, WorkTicket t) {
+		t.setAPNotification(a);
 		currentBalance += a;
 		totalAwards += a;
 		Main.updateBalance();
 		save();
 	}
 
-	public void penalize(double p) {
-		new awardPenaltyNotification(-1 * p);
+	public void penalize(double p, WorkTicket t) {
+		t.setAPNotification(-1*p);
 		currentBalance -= p;
 		totalPenalties += p;
 		Main.updateBalance();

@@ -5,10 +5,11 @@ import org.neo4j.ogm.annotation.Relationship;
 
 @NodeEntity
 public class WorkTicketProcess extends Notification {
-	@Relationship(type = "BELONGS_TO", direction = Relationship.OUTGOING)
+
+	@Relationship(type = "PARENT_TICKET", direction = Relationship.OUTGOING)
 	private WorkTicket ticket;
 
-	@Relationship(type = "PARENT_TAST", direction = Relationship.OUTGOING)
+	@Relationship(type = "PARENT_TASK", direction = Relationship.OUTGOING)
 	private Task task;
 
 	protected WorkTicketProcess() {
@@ -20,9 +21,13 @@ public class WorkTicketProcess extends Notification {
 	}
 
 	protected WorkTicketProcess(WorkTicket t, Task task) {
-		super("Work Ticket: " + task.getTitle() + " requires action!", "Please complete this survey to recieve award($"
-				+ task.getAward() + "), penalty($" + task.getPenalty() + "), or extension.");
-		ticket = t;
+		super((t.isInstance() ? "Instance Reminder: " + task.getTitle() + "!"
+				: "Work Ticket: " + task.getTitle() + " requires action!"),
+				(t.isInstance() ? "Have you fullfilled this reminder?"
+						: "Please complete this survey to recieve award($" + task.getAward() + "), penalty($"
+								+ task.getPenalty() + "), or extension."));
+
+		this.ticket = t;
 		this.task = task;
 		save();
 	}
@@ -31,11 +36,11 @@ public class WorkTicketProcess extends Notification {
 		Main.getPrimaryStage().getScene().setRoot(new WorkTicketSurvey(this));
 	}
 
-	public Task getTask() {
-		return task;
-	}
-
 	public WorkTicket getTicket() {
 		return ticket;
+	}
+
+	public Task getTask() {
+		return task;
 	}
 }

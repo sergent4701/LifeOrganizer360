@@ -12,6 +12,7 @@ import org.neo4j.driver.TransactionWork;
 
 import static org.neo4j.driver.Values.parameters;
 
+import java.text.DecimalFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -60,12 +61,12 @@ public class Main extends Application {
 	private static Stage primaryStage = null;
 	private static VBox workspaceContainer = new VBox();
 	private static HBox mainContainer = new HBox();
-	private static Button notificationsBtn;
+	private static Button notificationsBtn = new Button();
 	private static Label greeting;
 
 	private static ArrayList<TaskBase> entities;
 	private static ArrayList<Saveable> nodes;
-	private static ArrayList<Notification> notifications;
+	private static ArrayList<Notification> notifications = new ArrayList<Notification>();
 	private static ArrayList<WorkTicket> tickets;
 	private static Account user;
 	private static boolean dependencyInit = false;
@@ -77,8 +78,6 @@ public class Main extends Application {
 	private double minimumWindowWidth = 450;
 	private double minimumWindowHeight = 350;
 
-	private static int alertCount = 0;
-
 	private static org.neo4j.driver.Driver nativeDriver = null;
 	private static Driver ogmDriver = null;
 	private static SessionFactory sessionFactory = null;
@@ -86,11 +85,10 @@ public class Main extends Application {
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public void start(final Stage p) {
-		Timeline taskTimer = new Timeline(new KeyFrame(Duration.millis(60000), ae -> taskTimer()));
-		taskTimer.play();
 
 		Button workspaceBtn = new Button("Workspace");
-		notificationsBtn = new Button("Notifications (" + alertCount + ")");
+		oneMinFunction();
+		updateNotifications();
 
 		VBox functionalBtns = new VBox(3, workspaceBtn, notificationsBtn);
 
@@ -115,9 +113,9 @@ public class Main extends Application {
 		Label logo = new Label("Life Organizer 360©");
 		logo.setFont(new Font(25));
 
-		greeting = new Label("Welcome " + user.getFirstName() + " " + user.getLastName() + ", you have $"
-				+ user.getBalance() + " in your account!");
+		greeting = new Label();
 		greeting.setFont(new Font(18));
+		updateBalance();
 
 		Button addBtn = new Button("+");
 
@@ -183,7 +181,7 @@ public class Main extends Application {
 			public void handle(Event event) {
 				scene.setRoot(workspaceContainer);
 				for (TaskBase e : entities) {
-					if (!e.isHidden())
+					if (!e.isHidden() && !workspace.getChildren().contains(e.getWorkspacePane()))
 						workspace.getChildren().add(e.getWorkspacePane());
 				}
 				for (TaskBase e : entities) {
@@ -279,16 +277,15 @@ public class Main extends Application {
 	}
 
 	public static void loadNodes() {
-		nodes = new ArrayList<Saveable>(session.loadAll(Saveable.class, -1));
+
+		nodes = new ArrayList<Saveable>(session.loadAll(Saveable.class, 3));
+
 		entities = new ArrayList<TaskBase>();
-		notifications = new ArrayList<Notification>();
 		tickets = new ArrayList<WorkTicket>();
 		for (Saveable s : nodes)
 			if (s instanceof TaskBase)
 				entities.add((TaskBase) s);
 			else if (s instanceof Notification) {
-				if (((Notification) s).isAlert())
-					alertCount++;
 				notifications.add((Notification) s);
 			} else if (s instanceof WorkTicket && ((WorkTicket) s).getTask() != null)
 				tickets.add((WorkTicket) s);
@@ -354,8 +351,14 @@ public class Main extends Application {
 	}
 
 	public static void addNotification(Notification n) {
-		notifications.add(n);
-		notificationsBtn.setText("Notifications (" + (++alertCount) + ")");
+		if (!notifications.contains(n))
+			notifications.add(n);
+		updateNotifications();
+	}
+
+	public static void deleteNotification(Notification n) {
+		notifications.remove(n);
+		updateNotifications();
 	}
 
 	public static void deleteTicket(WorkTicket t) {
@@ -366,7 +369,7 @@ public class Main extends Application {
 		return mainContainer;
 	}
 
-	private void taskTimer() {
+	private void oneMinFunction() {
 
 		for (WorkTicket t : tickets) {
 			if (t instanceof RecurringTicket) {
@@ -374,32 +377,52 @@ public class Main extends Application {
 				for (WorkTicket sub : r.getTickets()) {
 					if (sub.getStatus().equals(WorkTicket.INPROGRESS)
 							&& sub.getEnd().compareTo(LocalDateTime.now()) < 0) {
-						sub.setStatus(WorkTicket.REQUIRESACTION);
-						new WorkTicketProcess(sub, r.getTask());
+						sub.setStatus(WorkTicket.REQUIRESACTION, r.getTask());
+						sub.setEndNotification(r.getTask());
+					} else if (sub.getStatus().equals(WorkTicket.INPROGRESS)
+							&& sub.getStart().compareTo(LocalDateTime.now()) < 0) {
+						sub.setStartNotification(r.getTask());
 					}
 				}
 
 			} else if (t.getStatus().equals(WorkTicket.INPROGRESS) && t.getEnd().compareTo(LocalDateTime.now()) < 0) {
-				t.setStatus(WorkTicket.REQUIRESACTION);
-				new WorkTicketProcess(t);
+				t.setStatus(WorkTicket.REQUIRESACTION, t.getTask());
+				t.setEndNotification();
+			} else if (t.getStatus().equals(WorkTicket.INPROGRESS) && t.getStart().compareTo(LocalDateTime.now()) < 0) {
+				t.setStartNotification();
 			}
 		}
 
-		Timeline taskTimer = new Timeline(new KeyFrame(Duration.millis(60000), ae -> taskTimer()));
-		taskTimer.play();
-	}
+		Timeline oneMinTimer = new Timeline(
+				new KeyFrame(Duration.millis(60000 - System.currentTimeMillis() % 60000), ae -> oneMinFunction()));
+		oneMinTimer.play();
 
-	public static void subAlert() {
-		notificationsBtn.setText("Notifications (" + (--alertCount) + ")");
 	}
 
 	public static Account getUser() {
 		return user;
 	}
 
+	public static void updateNotifications() {
+		int i = getNumberOfActive();
+		notificationsBtn.setText("Notifications " + (i > 0 ? "(" + i + ")" : ""));
+
+	}
+
+	public static int getNumberOfActive() {
+		int i = 0;
+		for (Notification n : notifications) {
+			if (n.isAlert())
+				i++;
+		}
+		return i;
+	}
+
 	public static void updateBalance() {
+		DecimalFormat df = new DecimalFormat("#0.00");
+
 		greeting.setText("Welcome " + user.getFirstName() + " " + user.getLastName() + ", you have $"
-				+ user.getBalance() + " in your account!");
+				+ df.format(user.getBalance()) + " in your account!");
 	}
 
 }

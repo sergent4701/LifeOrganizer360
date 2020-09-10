@@ -2,6 +2,7 @@ package com.lifeorganizer360;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 import javafx.beans.value.ObservableValue;
 import javafx.event.Event;
@@ -10,6 +11,7 @@ import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ColorPicker;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
@@ -26,7 +28,7 @@ import tornadofx.control.DateTimePicker;
 import javafx.scene.Parent;
 
 @SuppressWarnings({ "rawtypes", "unchecked" })
-public class CreateTaskForm extends VBox {
+public class CreateTaskForm extends ScrollPane {
 	public static final String WORKSPACE = "WORKSPACE", RECEEDED = "RECEEDED", PROFILE = "PROFILE";
 
 	protected CreateTaskForm(String type) {
@@ -34,9 +36,7 @@ public class CreateTaskForm extends VBox {
 	}
 
 	protected CreateTaskForm(String type, TaskBase parent) {
-		VBox v = this;
-
-		this.setSpacing(10);
+		VBox v = new VBox(10);
 
 		Button backBtn = new Button("<--");
 
@@ -70,27 +70,37 @@ public class CreateTaskForm extends VBox {
 
 		HBox apContainer = new HBox(10, awardV, penaltyV);
 
+		ColorPicker colorPicker = new ColorPicker();
+		colorPicker.getCustomColors().addAll(Task.colors);
+		colorPicker.setValue(Task.colors[0]);
+
 		Label ticketsL = new Label("Tickets:");
 		Button addTicket = new Button("Add");
 
-		VBox ticketList = new VBox(5);
-		ticketList.getChildren().add(createTicketItem());
+		VBox ticketList = new VBox(50);
 
+		ArrayList<HashMap> justAdded = new ArrayList<HashMap>();
 		addTicket.setOnAction(new EventHandler() {
 			public void handle(Event event) {
-				ticketList.getChildren().add(createTicketItem());
+				HashMap data = CreateTaskForm.createTicketItem(justAdded);
+				Pane p = (Pane) data.get("Return");
+				ticketList.getChildren().add(p);
 			}
 		});
+
+		HashMap data = CreateTaskForm.createTicketItem(justAdded);
+		Pane p = (Pane) data.get("Return");
+		ticketList.getChildren().add(p);
 
 		VBox ticketContainer = new VBox(ticketsL, ticketList, addTicket);
 
 		Button submitBtn = new Button("Submit");
 
-		this.getChildren().add(backBtn);
+		v.getChildren().add(backBtn);
 		if (type.equals(WORKSPACE))
-			this.getChildren().add(dropdown);
+			v.getChildren().add(dropdown);
 		if (!type.equals(RECEEDED) && !type.equals(PROFILE)) {
-			this.getChildren().addAll(titleV, descV, apContainer, ticketContainer, submitBtn);
+			v.getChildren().addAll(titleV, descV, apContainer, colorPicker, ticketContainer, submitBtn);
 		} else {
 			VBox searchPane = new VBox(5);
 			TextField search = new TextField();
@@ -100,7 +110,7 @@ public class CreateTaskForm extends VBox {
 
 			VBox newContainer = new VBox();
 
-			newContainer.getChildren().addAll(titleV, descV, apContainer, ticketContainer, submitBtn);
+			newContainer.getChildren().addAll(titleV, descV, apContainer, colorPicker, ticketContainer, submitBtn);
 
 			ScrollPane searchScroll = new ScrollPane();
 			searchScroll.setContent(searchPane);
@@ -176,17 +186,17 @@ public class CreateTaskForm extends VBox {
 				}
 			});
 			newAndSearch.getChildren().addAll(newContainer, searchScroll);
-			this.getChildren().add(newAndSearch);
+			v.getChildren().add(newAndSearch);
 		}
 
 		dropdown.getSelectionModel().selectedItemProperty().addListener((options, oldValue, newValue) -> {
 			switch (newValue) {
 			case "Goal":
-				this.getChildren().removeAll(apContainer, ticketContainer);
+				v.getChildren().removeAll(apContainer, colorPicker, ticketContainer);
 				break;
 			case "Task":
-				this.getChildren().removeAll(submitBtn);
-				this.getChildren().addAll(apContainer, ticketContainer, submitBtn);
+				v.getChildren().removeAll(submitBtn);
+				v.getChildren().addAll(apContainer, colorPicker, ticketContainer, submitBtn);
 				break;
 			}
 		});
@@ -213,36 +223,12 @@ public class CreateTaskForm extends VBox {
 								break;
 							case "Task":
 								x = new Task(titleF.getText(), descF.getText(), Double.parseDouble(awardF.getText()),
-										Double.parseDouble(penaltyF.getText()), e.getX(), e.getY());
-								for (Node n : ticketList.getChildren()) {
-									WorkTicket t = null;
-									VBox v = (VBox) n;
-									LocalDateTime start = ((DateTimePicker) ((VBox) ((HBox) v.getChildren().get(0))
-											.getChildren().get(0)).getChildren().get(1)).getDateTimeValue();
-									LocalDateTime end = ((DateTimePicker) ((VBox) ((HBox) v.getChildren().get(0))
-											.getChildren().get(1)).getChildren().get(1)).getDateTimeValue();
-									if (((CheckBox) ((VBox) v.getChildren().get(1)).getChildren().get(0))
-											.isSelected()) {
-										LocalDateTime stopDate = ((DateTimePicker) ((VBox) ((VBox) v.getChildren()
-												.get(1)).getChildren().get(2)).getChildren().get(1)).getDateTimeValue();
-										String type = (String) ((ComboBox) ((VBox) v.getChildren().get(1)).getChildren()
-												.get(1)).getValue();
-										if (type.equals(RecurringTicket.WEEKLY)) {
-											HBox daysContainer = (HBox) ((VBox) v.getChildren().get(1)).getChildren()
-													.get(3);
-											boolean[] days = new boolean[7];
-											for (int i = 0; i < 7; i++) {
-												days[i] = ((CheckBox) daysContainer.getChildren().get(i)).isSelected();
-											}
-											t = new RecurringTicket((Task) x, start, end, stopDate, type, days);
-										} else
-											t = new RecurringTicket((Task) x, start, end, stopDate, type);
-									} else
-										t = new WorkTicket((Task) x, start, end);
-									((Task) x).addTicket(t);
-									Main.addTicket(t);
-									t.save();
+										Double.parseDouble(penaltyF.getText()), e.getX(), e.getY(),
+										colorPicker.getValue());
+								for (HashMap n : justAdded) {
+									saveTicket(n, (Task) x);
 								}
+								((Task) x).setHandleCompletionNotification(((Task) x).sendCompletionRequest());
 								break;
 							}
 							Main.getEntities().add(x);
@@ -256,34 +242,11 @@ public class CreateTaskForm extends VBox {
 					Main.getWorkspace().addEventFilter(MouseEvent.MOUSE_CLICKED, filter);
 				} else {
 					Task x = new Task(titleF.getText(), descF.getText(), Double.parseDouble(awardF.getText()),
-							Double.parseDouble(penaltyF.getText()));
-					for (Node n : ticketList.getChildren()) {
-						WorkTicket t = null;
-						VBox v = (VBox) n;
-						LocalDateTime start = ((DateTimePicker) ((VBox) ((HBox) v.getChildren().get(0)).getChildren()
-								.get(0)).getChildren().get(1)).getDateTimeValue();
-						LocalDateTime end = ((DateTimePicker) ((VBox) ((HBox) v.getChildren().get(0)).getChildren()
-								.get(1)).getChildren().get(1)).getDateTimeValue();
-						if (((CheckBox) ((VBox) v.getChildren().get(1)).getChildren().get(0)).isSelected()) {
-							String type = (String) ((ComboBox) ((VBox) v.getChildren().get(1)).getChildren().get(1))
-									.getValue();
-							LocalDateTime stopDate = ((DateTimePicker) ((VBox) ((VBox) v.getChildren().get(1))
-									.getChildren().get(2)).getChildren().get(1)).getDateTimeValue();
-							if (type.equals(RecurringTicket.WEEKLY)) {
-								HBox daysContainer = (HBox) ((VBox) v.getChildren().get(1)).getChildren().get(3);
-								boolean[] days = new boolean[7];
-								for (int i = 0; i < 7; i++) {
-									days[i] = ((CheckBox) daysContainer.getChildren().get(i)).isSelected();
-								}
-								t = new RecurringTicket((Task) x, start, end, stopDate, type, days);
-							} else
-								t = new RecurringTicket((Task) x, start, end, stopDate, type);
-						} else
-							t = new WorkTicket((Task) x, start, end);
-						((Task) x).addTicket(t);
-						Main.addTicket(t);
-						t.save();
+							Double.parseDouble(penaltyF.getText()), colorPicker.getValue());
+					for (HashMap n : justAdded) {
+						saveTicket(n, (Task) x);
 					}
+					((Task) x).setHandleCompletionNotification(((Task) x).sendCompletionRequest());
 
 					Main.getEntities().add(x);
 
@@ -307,17 +270,29 @@ public class CreateTaskForm extends VBox {
 					Main.getPrimaryStage().getScene().setRoot(parent.getProfilePane());
 			}
 		});
+		setContent(v);
 	}
 
 	public static Pane createTicketItem(WorkTicket t) {
 		VBox ret = new VBox(3);
+		Button delBtn = new Button("X");
 		Label header = null;
+		HBox row = null;
+
 		if (t instanceof RecurringTicket) {
 			header = new Label("Recurring Task");
-		} else
+			row = new HBox(new Label("Start: " + t.getStart()),
+					new Label("End: " + ((RecurringTicket) t).getStopDate()), delBtn);
+		} else if (t instanceof TrailingTicket) {
+			header = new Label("Trailing Task");
+			row = new HBox(new Label("Start: " + t.getStart()), new Label("End: " + t.getEnd()), delBtn);
+		} else if (t.isInstance()) {
+			header = new Label("Instance Task");
+			row = new HBox(new Label("Reminder Time" + t.getStart()), delBtn);
+		} else {
 			header = new Label("Task");
-		Button delBtn = new Button("X");
-		HBox row = new HBox(new Label("Start: " + t.getStart()), new Label("End: " + t.getEnd()), delBtn);
+			row = new HBox(new Label("Start: " + t.getStart()), new Label("End: " + t.getEnd()), delBtn);
+		}
 
 		ret.getChildren().addAll(header, row);
 		delBtn.setOnAction(new EventHandler() {
@@ -329,33 +304,69 @@ public class CreateTaskForm extends VBox {
 		return ret;
 	}
 
-	public static Pane createTicketItem() {
+	public static HashMap createTicketItem(ArrayList<HashMap> list) {
+
+		HashMap<String, Node> content = new HashMap<String, Node>();
+
+		list.add(content);
+
+		Button delBtn = new Button("X");
+		Label infoL = new Label("Additional Info:");
+		HBox temp = new HBox(3, infoL, delBtn);
+		final TextArea infoF = new TextArea();
+		content.put("InfoBox", infoF);
+		VBox infoV = new VBox(3, temp, infoF);
+		infoF.setMaxWidth(387);
+		infoF.setMaxHeight(70);
 
 		Label startL = new Label("Start:");
 		final DateTimePicker startF = new DateTimePicker();
 		startF.setFormat("MMM dd, yyyy hh:mm a");
+		content.put("StartPicker", startF);
 		VBox startV = new VBox(3, startL, startF);
 
 		Label endL = new Label("End:");
 		final DateTimePicker endF = new DateTimePicker();
 		endF.setFormat("MMM dd, yyyy hh:mm a");
+		content.put("EndPicker", endF);
 		VBox endV = new VBox(3, endL, endF);
 
 		Label stopDateL = new Label("Stop Date:");
 		final DateTimePicker stopDateF = new DateTimePicker();
 		stopDateF.setFormat("MMM dd, yyyy hh:mm a");
+		content.put("StopDatePicker", stopDateF);
 		VBox stopDateV = new VBox(3, stopDateL, stopDateF);
 
-		Button delBtn = new Button("X");
+		HBox secontainer = new HBox(10, startV, endV);
 
-		HBox secontainer = new HBox(10, startV, endV, delBtn);
+		CheckBox instance = new CheckBox("Instance?");
+		content.put("InstanceCheckBox", instance);
+
 		CheckBox recurring = new CheckBox("Recurring?");
+		content.put("RecurringCheckBox", recurring);
+
+		CheckBox trailingCheckBox = new CheckBox("Trailing?");
+		content.put("TrailingCheckBox", trailingCheckBox);
+
+		instance.selectedProperty()
+				.addListener((ObservableValue<? extends Boolean> ov, Boolean old_val, Boolean new_val) -> {
+					if (new_val) {
+						secontainer.getChildren().removeAll(endV);
+						startL.setText("Reminder Time:");
+
+					} else {
+						if (!secontainer.getChildren().contains(endV))
+							secontainer.getChildren().addAll(endV);
+						startL.setText("Start:");
+					}
+				});
 
 		final ComboBox<String> dropdown = new ComboBox<String>();
 		dropdown.setPromptText("Select Frequency");
 		dropdown.getItems().add(RecurringTicket.DAILY);
 		dropdown.getItems().add(RecurringTicket.EVERYOTHERDAY);
 		dropdown.getItems().add(RecurringTicket.WEEKLY);
+		content.put("Dropdown", dropdown);
 
 		CheckBox[] days = new CheckBox[7];
 		days[0] = new CheckBox("M");
@@ -366,19 +377,14 @@ public class CreateTaskForm extends VBox {
 		days[5] = new CheckBox("Sat");
 		days[6] = new CheckBox("Sun");
 
+		for (int i = 0; i < days.length; i++) {
+			content.put(i + "", days[i]);
+		}
+
 		HBox daysContainer = new HBox(3, days);
 
 		VBox recurringcontainer = new VBox(10, recurring);
-		recurring.selectedProperty()
-				.addListener((ObservableValue<? extends Boolean> ov, Boolean old_val, Boolean new_val) -> {
-					if (new_val) {
-						if (!recurringcontainer.getChildren().contains(dropdown)) {
-							recurringcontainer.getChildren().addAll(dropdown, stopDateV);
-						}
-					} else {
-						recurringcontainer.getChildren().removeAll(dropdown, stopDateV);
-					}
-				});
+
 		dropdown.getSelectionModel().selectedItemProperty().addListener((options, oldValue, newValue) -> {
 			switch (newValue) {
 			case RecurringTicket.DAILY:
@@ -390,14 +396,85 @@ public class CreateTaskForm extends VBox {
 				break;
 			}
 		});
-		VBox ret = new VBox(secontainer, recurringcontainer);
+		VBox seSelection = new VBox(instance, secontainer);
+		VBox ret = new VBox(5, infoV, seSelection, recurringcontainer, trailingCheckBox);
 
+		trailingCheckBox.selectedProperty()
+				.addListener((ObservableValue<? extends Boolean> ov, Boolean old_val, Boolean new_val) -> {
+					if (new_val) {
+						ret.getChildren().removeAll(recurringcontainer);
+					} else {
+						if (!ret.getChildren().contains(recurringcontainer)) {
+							ret.getChildren().removeAll(trailingCheckBox);
+							ret.getChildren().addAll(recurringcontainer, trailingCheckBox);
+						}
+					}
+				});
 		delBtn.setOnAction(new EventHandler() {
 			public void handle(Event event) {
 				((Pane) ret.getParent()).getChildren().remove(ret);
+				list.remove(content);
 			}
 		});
-		return ret;
-
+		recurring.selectedProperty()
+				.addListener((ObservableValue<? extends Boolean> ov, Boolean old_val, Boolean new_val) -> {
+					if (new_val) {
+						if (!recurringcontainer.getChildren().contains(dropdown)) {
+							recurringcontainer.getChildren().addAll(dropdown, stopDateV);
+						}
+						ret.getChildren().removeAll(trailingCheckBox);
+					} else {
+						recurringcontainer.getChildren().removeAll(dropdown, stopDateV);
+						if (!ret.getChildren().contains(trailingCheckBox)) {
+							ret.getChildren().addAll(trailingCheckBox);
+						}
+					}
+				});
+		content.put("Return", ret);
+		return content;
 	}
+
+	public static void saveTicket(HashMap n, Task a) {
+		WorkTicket t = null;
+
+		String info = ((TextArea) n.get("InfoBox")).getText();
+
+		boolean instance = ((CheckBox) n.get("InstanceCheckBox")).isSelected();
+
+		LocalDateTime start = ((DateTimePicker) n.get("StartPicker")).getDateTimeValue();
+		LocalDateTime end = ((DateTimePicker) n.get("EndPicker")).getDateTimeValue();
+		if (((CheckBox) n.get("RecurringCheckBox")).isSelected()) {
+			String type = (String) ((ComboBox) n.get("Dropdown")).getValue();
+			LocalDateTime stopDate = ((DateTimePicker) n.get("StopDatePicker")).getDateTimeValue();
+			if (type.equals(RecurringTicket.WEEKLY)) {
+				boolean[] days = new boolean[7];
+				for (int i = 0; i < 7; i++) {
+					days[i] = ((CheckBox) n.get(i + "")).isSelected();
+				}
+				if (instance)
+					t = new RecurringTicket(a, start, stopDate, type, days, info);
+				else
+					t = new RecurringTicket(a, start, end, stopDate, type, days, info);
+			} else {
+				if (instance)
+					t = new RecurringTicket(a, start, stopDate, type, info);
+				else
+					t = new RecurringTicket(a, start, end, stopDate, type, info);
+			}
+		} else if (((CheckBox) n.get("TrailingCheckBox")).isSelected()) {
+			if (instance)
+				t = new TrailingTicket(a, start, info);
+			else
+				t = new TrailingTicket(a, start, end, info);
+		} else {
+			if (instance)
+				t = new WorkTicket(a, start, info);
+			else
+				t = new WorkTicket(a, start, end, info);
+		}
+		a.addTicket(t);
+		Main.addTicket(t);
+		t.save();
+	}
+
 }

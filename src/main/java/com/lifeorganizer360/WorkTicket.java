@@ -17,10 +17,13 @@ public class WorkTicket extends Saveable {
 
 	@Transient
 	public static final String INPROGRESS = "In-progress", REQUIRESACTION = "Requires Action", AWARD = "Award",
-			PENALIZE = "Penalize", EXTEND = "Extend";
+			PENALIZE = "Penalize", EXTEND = "Extend", REPLACED = "Replaced";
 
 	@Property
 	private String status = INPROGRESS;
+
+	@Property
+	private String additionalInfo;
 
 	@Property
 	private double award, penalty;
@@ -38,10 +41,7 @@ public class WorkTicket extends Saveable {
 	private LocalDateTime realStart, realEnd;
 
 	@Property
-	private boolean busyWork, extendable;
-
-	@Property
-	private int color;
+	private boolean busyWork, extendable, instance;
 
 	@Relationship(type = "EXTENDS_TO", direction = Relationship.OUTGOING)
 	private WorkTicket extension;
@@ -49,13 +49,29 @@ public class WorkTicket extends Saveable {
 	@Relationship(type = "BELONGS_TO", direction = Relationship.OUTGOING)
 	private Task task;
 
+	@Relationship(type = "NOTIFYS_START", direction = Relationship.OUTGOING)
+	private Notification startNotification;
+
+	@Relationship(type = "NOTIFYS_END", direction = Relationship.OUTGOING)
+	private Notification endNotification;
+
+	@Relationship(type = "NOTIFYS_AP", direction = Relationship.OUTGOING)
+	private Notification apNotification;
+
 	protected WorkTicket() {
 	}
 
-	protected WorkTicket(Task t, LocalDateTime s, LocalDateTime e) {
+	protected WorkTicket(Task t, LocalDateTime a, String additionalInfo) {
+		this(t, a, a, additionalInfo);
+		this.instance = true;
+	}
+
+	protected WorkTicket(Task t, LocalDateTime s, LocalDateTime e, String additionalInfo) {
 		this.start = s;
 		this.end = e;
 		this.task = t;
+		this.instance = false;
+		this.additionalInfo = additionalInfo;
 	}
 
 	public LocalDateTime getStart() {
@@ -80,7 +96,11 @@ public class WorkTicket extends Saveable {
 		return task;
 	}
 
-	public void setStatus(String s) {
+	public void setStatus(String s, Task t) {
+		if (status.equals(REQUIRESACTION) && !s.equals(REQUIRESACTION)) {
+			t.setHandleCompletionNotification(t.sendCompletionRequest());
+		}
+
 		status = s;
 		save();
 	}
@@ -93,6 +113,12 @@ public class WorkTicket extends Saveable {
 		if (task != null)
 			task.deleteTicket(this);
 		Main.deleteTicket(this);
+		if (startNotification != null)
+			startNotification.delete();
+		if (endNotification != null)
+			endNotification.delete();
+		if (apNotification != null)
+			apNotification.delete();
 		super.delete();
 	}
 
@@ -104,9 +130,12 @@ public class WorkTicket extends Saveable {
 		return extendable;
 	}
 
+	public void generateStartNotification() {
+
+	}
+
 	public void surveryUpdate(double adjustedAward, double adjustedPenalty, int difficulty, int focus, int anxiety,
-			int frustration, int workPace, boolean busyWork, LocalDateTime adjustedStart, LocalDateTime adjustedEnd,
-			String status) {
+			int frustration, int workPace, boolean busyWork, LocalDateTime adjustedStart, LocalDateTime adjustedEnd) {
 		this.adjustedAward = adjustedAward;
 		this.adjustedPenalty = adjustedPenalty;
 		this.difficulty = difficulty;
@@ -117,6 +146,39 @@ public class WorkTicket extends Saveable {
 		this.busyWork = busyWork;
 		this.realStart = adjustedStart;
 		this.realEnd = adjustedEnd;
-		setStatus(status);
+	}
+
+	public boolean isInstance() {
+		return instance;
+	}
+
+	public void setStartNotification() {
+		setStartNotification(this.getTask());
+	}
+
+	public void setStartNotification(Task t) {
+		if (startNotification == null)
+			startNotification = new WorkTicketStart(this, t);
+		save();
+	}
+
+	public void setEndNotification() {
+		setEndNotification(this.getTask());
+	}
+
+	public void setEndNotification(Task t) {
+		if (endNotification == null)
+			endNotification = new WorkTicketProcess(this, t);
+		save();
+	}
+
+	public void setAPNotification(double a) {
+		if (apNotification == null)
+			apNotification = new AwardPenaltyNotification(a);
+		save();
+	}
+
+	public String getInfo() {
+		return additionalInfo;
 	}
 }

@@ -31,9 +31,14 @@ import javafx.scene.shape.Line;
 @SuppressWarnings("restriction")
 @NodeEntity
 public class Task extends TaskBase {
+	public static Color[] colors = new Color[] { Color.AQUA, Color.BLUE, Color.BROWN, Color.CADETBLUE, Color.CORAL,
+			Color.DARKBLUE, Color.DARKCYAN, Color.DARKORCHID, Color.DEEPPINK, Color.MEDIUMVIOLETRED };
 
 	@Property
 	private double award, penalty;
+
+	@Property
+	private int color;
 
 	@Transient
 	private ArrayList<Node> receededListItems = new ArrayList<Node>();
@@ -41,22 +46,27 @@ public class Task extends TaskBase {
 	@Relationship(type = "TICKET", direction = Relationship.OUTGOING)
 	private ArrayList<WorkTicket> tickets = new ArrayList<WorkTicket>();
 
+	@Relationship(type = "HANDLE_COMPLETION_NOTIFICATION", direction = Relationship.OUTGOING)
+	private Notification handleCompletionNotification;
+
 	protected Task() {
 		super();
 	}
 
-	protected Task(String title, String description, double award, double penalty, double xPos, double yPos) {
+	protected Task(String title, String description, double award, double penalty, double xPos, double yPos, Color c) {
 		super(title, description, xPos, yPos);
 		this.award = award;
 		this.penalty = penalty;
+		setColor(c);
 		save();
 	}
 
-	protected Task(String title, String description, double award, double penalty) {
+	protected Task(String title, String description, double award, double penalty, Color c) {
 		super(title, description, 0, 0);
 		this.award = award;
 		this.penalty = penalty;
 		setHidden(true);
+		setColor(c);
 		save();
 	}
 
@@ -547,17 +557,63 @@ public class Task extends TaskBase {
 		return container;
 	}
 
+	public void setHandleCompletionNotification(boolean b) {
+		if (handleCompletionNotification == null)
+			handleCompletionNotification = new HandleCompletionNotification(this);
+		if (!isComplete() && b) {
+			Main.addNotification(handleCompletionNotification);
+		} else if (!b) {
+			Main.deleteNotification(handleCompletionNotification);
+		}
+		save();
+	}
+
 	public ArrayList<WorkTicket> getTickets() {
 		return tickets;
 	}
 
 	public void addTicket(WorkTicket t) {
 		tickets.add(t);
+		setHandleCompletionNotification(false);
 		save();
 	}
 
 	public void deleteTicket(WorkTicket t) {
 		tickets.remove(t);
+		setHandleCompletionNotification(sendCompletionRequest());
 		save();
+	}
+
+	public boolean sendCompletionRequest() {
+		boolean notify = true;
+
+		for (WorkTicket w : getTickets()) {
+
+			if (w instanceof RecurringTicket)
+				for (WorkTicket sub : ((RecurringTicket) w).getTickets()) {
+					if (sub.getStatus().equals(WorkTicket.INPROGRESS))
+						notify = false;
+				}
+			else if (w.getStatus().equals(WorkTicket.INPROGRESS))
+				notify = false;
+
+		}
+		return notify;
+	}
+
+	public Color getColor() {
+		return colors[color];
+	}
+
+	public void setColor(Color c) {
+		for (int i = 0; i < colors.length; i++) {
+			if (colors[i].equals(c))
+				color = i;
+			save();
+		}
+	}
+
+	public Notification getHandleCompletionNotification() {
+		return handleCompletionNotification;
 	}
 }

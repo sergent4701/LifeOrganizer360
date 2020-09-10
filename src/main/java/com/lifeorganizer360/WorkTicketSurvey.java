@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 import org.neo4j.ogm.annotation.Property;
 
+import javafx.beans.value.ObservableValue;
 import javafx.event.Event;
 import javafx.event.EventHandler;
 import javafx.geometry.Pos;
@@ -89,35 +90,82 @@ public class WorkTicketSurvey extends VBox {
 		if (w.getTicket().isExtendable())
 			dropdown.getItems().add(WorkTicket.EXTEND);
 
+		CheckBox trailingCheckBox = new CheckBox("Trailing?");
+
+		Label trailingStartL = new Label("Reminder Date:");
+		DateTimePicker trailingStartF = new DateTimePicker();
+		trailingStartF.setFormat("MMM dd, yyyy hh:mm a");
+		VBox startV = new VBox(3, trailingStartL, trailingStartF);
+
+		Label trailingEndL = new Label("End:");
+		DateTimePicker trailingEndF = new DateTimePicker();
+		trailingEndF.setFormat("MMM dd, yyyy hh:mm a");
+		VBox endV = new VBox(3, trailingEndL, trailingEndF);
+
 		Button submitBtn = new Button("Submit");
 		submitBtn.setOnAction(new EventHandler() {
 			public void handle(Event event) {
-				switch (dropdown.getValue()) {
-				case WorkTicket.AWARD:
-					Main.getUser().award(w.getTask().getAward());
-					break;
-				case WorkTicket.PENALIZE:
-					Main.getUser().penalize(w.getTask().getPenalty());
-					break;
-				case WorkTicket.EXTEND:
-					break;
-				}
 				w.getPane().setCursor(Cursor.DEFAULT);
 				Main.setBackgroundColor(Color.GRAY, w.getPane());
 				w.getTicket().surveryUpdate(Double.parseDouble(adjustedAwardF.getText()),
 						Double.parseDouble(adjustedPenaltyF.getText()), Integer.parseInt(difficultyF.getText()),
 						Integer.parseInt(focusF.getText()), Integer.parseInt(anxietyF.getText()),
 						Integer.parseInt(frustrationF.getText()), Integer.parseInt(workPaceF.getText()),
-						busyWorkF.isSelected(), adjustedStartF.getDateTimeValue(), adjustedEndF.getDateTimeValue(),
-						dropdown.getValue());
+						busyWorkF.isSelected(), adjustedStartF.getDateTimeValue(), adjustedEndF.getDateTimeValue());
 				w.setAlert(false);
+				w.getTicket().setStatus(dropdown.getValue(), w.getTask());
+				switch (dropdown.getValue()) {
+				case WorkTicket.AWARD:
+					Main.getUser().award(w.getTask().getAward(), w.getTicket());
+					break;
+				case WorkTicket.PENALIZE:
+					Main.getUser().penalize(w.getTask().getPenalty(), w.getTicket());
+					break;
+				case WorkTicket.EXTEND:
+					break;
+				}
+				TrailingTicket t = null;
+
+				if (w.getTicket() instanceof TrailingTicket && trailingCheckBox.isSelected()) {
+					if (w.getTicket().isInstance())
+						t = new TrailingTicket((TrailingTicket) w.getTicket(), trailingStartF.getDateTimeValue());
+					else {
+						t = new TrailingTicket((TrailingTicket) w.getTicket(), trailingStartF.getDateTimeValue(),
+								trailingEndF.getDateTimeValue());
+					}
+					w.getTask().addTicket(t);
+					Main.addTicket(t);
+					t.save();
+				}
 				Main.getPrimaryStage().getScene().setRoot(new NotificationDashboard());
 			}
 		});
 
+		HBox trailingDates = new HBox(5, startV);
+		if (!w.getTicket().isInstance()) {
+			trailingDates.getChildren().add(endV);
+			trailingStartL.setText("Start:");
+		}
+
+		HBox trailingContainer = new HBox(5, trailingCheckBox);
+
+		trailingCheckBox.selectedProperty()
+				.addListener((ObservableValue<? extends Boolean> ov, Boolean old_val, Boolean new_val) -> {
+					if (new_val) {
+						if (!trailingContainer.getChildren().contains(trailingDates)) {
+							trailingContainer.getChildren().addAll(trailingDates);
+						}
+					} else {
+						trailingContainer.getChildren().removeAll(trailingDates);
+					}
+				});
+
 		VBox[] cols = new VBox[2];
 		cols[0] = new VBox(difficultyC, focusC, anxietyC, adjustedAwardC, adjustedStartC, dropdown, submitBtn);
 		cols[1] = new VBox(frustrationyC, workPaceC, busyWorkC, penaltyAwardC, adjustedEndC);
+
+		if (w.getTicket() instanceof TrailingTicket)
+			cols[1].getChildren().add(trailingContainer);
 
 		HBox hor = new HBox(5, cols[0], cols[1]);
 
