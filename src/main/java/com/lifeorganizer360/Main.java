@@ -90,7 +90,9 @@ public class Main extends Application {
 		oneMinFunction();
 		updateNotifications();
 
-		VBox functionalBtns = new VBox(3, workspaceBtn, notificationsBtn);
+		Button taskListBtn = new Button("Task List");
+
+		VBox functionalBtns = new VBox(3, workspaceBtn, notificationsBtn, taskListBtn);
 
 		Button dailyBtn = new Button("Daily");
 		Button weeklyBtn = new Button("Weekly");
@@ -159,6 +161,11 @@ public class Main extends Application {
 		backBtn.setOnAction(new EventHandler() {
 			public void handle(Event event) {
 				scene.setRoot(mainContainer);
+			}
+		});
+		taskListBtn.setOnAction(new EventHandler() {
+			public void handle(Event event) {
+				scene.setRoot(new TaskList());
 			}
 		});
 
