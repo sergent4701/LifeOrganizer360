@@ -13,6 +13,10 @@ public class Arrow {
 
 	private int scaling = 10;
 
+	protected Arrow() {
+		this(0, 0, 0, 0);
+	}
+
 	protected Arrow(double startX, double startY, double endX, double endY) {
 		arrow[0] = new Line(startX, startY, endX, endY);
 		arrow[1] = generateLeg(45, scaling, arrow[0].getStartX(), arrow[0].getStartY(), arrow[0].getEndX(),
